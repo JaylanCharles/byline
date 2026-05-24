@@ -1,0 +1,97 @@
+package web
+
+import (
+	"fmt"
+	"net/http"
+
+	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-gonic/gin"
+)
+
+// UserHandler 用来定义与用户有关的路由
+type UserHandler struct {
+	emailExp    *regexp.Regexp
+	passwordExp *regexp.Regexp
+}
+
+func NewUserHandler() *UserHandler {
+	const (
+		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
+		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	)
+
+	// go 自带的 regexp 包，不支持很复杂的正则表达式，使用第三方包，然后重命名一下hhhh
+	emailExp := regexp.MustCompile(emailRegexPattern, regexp.None) // 第二个参数随便传
+	passwordExp := regexp.MustCompile(passwordRegexPattern, regexp.None)
+
+	return &UserHandler{
+		emailExp:    emailExp,
+		passwordExp: passwordExp,
+	}
+}
+
+func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
+	ug := server.Group("/users")
+	ug.POST("/signup", u.SignUp)
+	ug.POST("/login", u.Login)
+	ug.POST("/edit", u.Edit)
+	ug.GET("/profile", u.Profile)
+}
+
+// 这里入参使用ctx *gin.Context 而不是 使用server *gin.Engine
+// 是因为	server.POST("/users/signup", u.SignUp) POST要求第二个入参使用type HandlerFunc func(*Context)
+func (u *UserHandler) SignUp(ctx *gin.Context) {
+	// 使用内部结构体 因为不想让别的方法看见这个结构体
+	type SignUpReq struct {
+		Email string `json:"email"`
+		// 有些人感觉ConfirmPassword不用后端接收处理，前端校验就可以了，是可以的
+		ConfirmPassword string `json:"confirmPassword"`
+		Password        string `json:"password"`
+	}
+
+	var req SignUpReq
+	// Bind 方法会根据 Content-Type 来解析你的数据到 req
+	// 解析错了，就会直接写回一个 400 的错误
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	ok, err := u.emailExp.MatchString(req.Email)
+	if err != nil {
+		// 说明正则表达式有问题
+		ctx.String(http.StatusOK, "系统错误") // 不要将具体错误返回给前端，因为这是内部错误
+		return
+	}
+	if !ok {
+		ctx.String(http.StatusOK, "你的邮箱格式不对")
+		return
+	}
+
+	if req.Password != req.ConfirmPassword {
+		ctx.String(http.StatusOK, "两次输入的密码不一致")
+		return
+	}
+
+	ok, err = u.passwordExp.MatchString(req.Password)
+	if err != nil {
+		// 记录日志
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !ok {
+		ctx.String(http.StatusOK, "密码必须大于8位，包含数字、特殊字符")
+		return
+	}
+	ctx.String(http.StatusOK, "注册成功")
+	fmt.Printf("%v", req)
+	// 数据库操作
+}
+func (u *UserHandler) Login(ctx *gin.Context) {
+
+}
+func (u *UserHandler) Edit(ctx *gin.Context) {
+
+}
+func (u *UserHandler) Profile(ctx *gin.Context) {
+
+}
