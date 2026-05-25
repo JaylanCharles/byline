@@ -1,20 +1,22 @@
 package web
 
 import (
-	"fmt"
 	"net/http"
 
+	"github.com/JaylanCharles/byline/internal/domain"
+	"github.com/JaylanCharles/byline/internal/service"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-gonic/gin"
 )
 
 // UserHandler 用来定义与用户有关的路由
 type UserHandler struct {
+	svc         *service.UserService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 }
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(svc *service.UserService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
@@ -27,6 +29,7 @@ func NewUserHandler() *UserHandler {
 	return &UserHandler{
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
+		svc:         svc,
 	}
 }
 
@@ -83,8 +86,18 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 	ctx.String(http.StatusOK, "注册成功")
-	fmt.Printf("%v", req)
+
 	// 数据库操作
+	// 调用一下 service 的方法
+	// 注意 err 一定要规范处理
+	err = u.svc.SignUp(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
 }
 func (u *UserHandler) Login(ctx *gin.Context) {
 

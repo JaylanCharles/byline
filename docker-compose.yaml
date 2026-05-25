@@ -7,6 +7,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
     volumes:
+      - # 设置初始化脚本，将 ./script/mysql/ 映射到 docker 内部执行
       - ./script/mysql/:/docker-entrypoint-initdb.d/
     ports:
       - 13316:3306
