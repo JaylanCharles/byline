@@ -2,13 +2,17 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
+var (
+	ErrUserDuplicateEmail    = repository.ErrUserDuplicateEmail
+	ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
+)
 
 type UserService struct {
 	repo *repository.UserRepository
@@ -31,4 +35,23 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	u.Password = string(hash)
 	// 存起来
 	return svc.repo.Create(ctx, u)
+}
+
+func (svc *UserService) Login(ctx context.Context, email, password string) error {
+	// 先找用户
+	u, err := svc.repo.FindByEmail(ctx, email)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return ErrInvalidUserOrPassword
+	}
+	if err != nil {
+		return err
+	}
+	// 比较密码
+	// 这里就要考虑，返回错误，要让前端知道是系统错误还是账号密码错误，所以要定义新的错误类型
+	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+	if err != nil {
+		// 需要日志 可以使用 DEBUG 类型，或者使用 INFO 类型，因为密码输入错误常见
+		return ErrInvalidUserOrPassword
+	}
+	return nil
 }
