@@ -2,9 +2,15 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrUserDuplicateEmail = errors.New("邮箱冲突")
 )
 
 // User 直接对应数据库表
@@ -34,5 +40,15 @@ func (dao *UserDAO) Insert(ctx context.Context, u User) error {
 	now := time.Now().UnixMilli()
 	u.Utime = now
 	u.Ctime = now
-	return dao.db.WithContext(ctx).Create(&u).Error
+	err := dao.db.WithContext(ctx).Create(&u).Error
+	// 这段代码是跟底层强耦合的代码，因为如果底层数据库不适用 mysql 的话，这段代码就 gg 了
+	// 虽然是强耦合，但是问题不大，因为正常人不会动不动换数据库
+	if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok {
+		const uniqueConfictsErrNo uint16 = 1062
+		if mysqlErr.Number == uniqueConfictsErrNo {
+			// 邮箱冲突
+			return ErrUserDuplicateEmail
+		}
+	}
+	return err
 }

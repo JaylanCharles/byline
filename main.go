@@ -16,12 +16,28 @@ import (
 
 func main() {
 	db := InitDB()
-	
+
 	server := InitWebServer()
 	u := InitUser(db)
 	u.RegisterRoutes(server)
 
 	server.Run(":8080")
+}
+
+func InitDB() *gorm.DB {
+	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/byline"))
+	// 只会在初始化过程中使用 panic
+	// panic 相当于整个 goroutine 结束
+	// 一旦初始化过程出错，应用就不要启动了
+	if err != nil {
+		panic(err)
+	}
+
+	err = dao.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }
 
 func InitWebServer() *gin.Engine {
@@ -58,20 +74,4 @@ func InitUser(db *gorm.DB) *web.UserHandler {
 	//u := &web.UserHandler{}
 	u := web.NewUserHandler(svc)
 	return u
-}
-
-func InitDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/byline"))
-	// 只会在初始化过程中使用 panic
-	// panic 相当于整个 goroutine 结束
-	// 一旦初始化过程出错，应用就不要启动了
-	if err != nil {
-		panic(err)
-	}
-
-	err = dao.InitTable(db)
-	if err != nil {
-		panic(err)
-	}
-	return db
 }
