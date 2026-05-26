@@ -11,6 +11,8 @@ import (
 
 var (
 	ErrUserDuplicateEmail = errors.New("邮箱冲突")
+	// 正常来说，需要自己写错误信息，但是 gorm 提供了这个错误信息，就不需要自己写了
+	ErrUserNotFound = gorm.ErrRecordNotFound
 )
 
 // User 直接对应数据库表
@@ -34,7 +36,11 @@ func NewUserDAO(db *gorm.DB) *UserDAO {
 		db: db,
 	}
 }
-
+func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
+	return u, err
+}
 func (dao *UserDAO) Insert(ctx context.Context, u User) error {
 	// 推荐存毫秒数
 	now := time.Now().UnixMilli()
