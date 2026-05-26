@@ -8,7 +8,10 @@ import (
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
+	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -64,6 +67,15 @@ func InitWebServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	// cookie 是可以换成 redis 的
+	store := cookie.NewStore([]byte("secret"))
+	server.Use(sessions.Sessions("mysession", store))
+	server.Use(middleware.NewLoginMiddlewareBuilder().
+		IgorePaths("/user/signup").
+		IgorePaths("/user/login").
+		Build())
+
 	return server
 }
 

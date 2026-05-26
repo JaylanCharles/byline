@@ -7,6 +7,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -116,7 +117,7 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 		return
 	}
 	// 参数少，可以不使用 domain.User
-	err := u.svc.Login(ctx, req.Email, req.Password)
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
 	if errors.Is(err, service.ErrInvalidUserOrPassword) {
 		// 记录日志
 		ctx.String(http.StatusOK, "用户名或密码不对")
@@ -126,6 +127,11 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
+	
+	// 登录成功了
+	sess := sessions.Default(ctx)
+	sess.Set("userId", user.Id)
+	sess.Save()
 	ctx.String(http.StatusOK, "登录成功")
 	return
 }
