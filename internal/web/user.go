@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/JaylanCharles/byline/internal/domain"
@@ -85,7 +86,6 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "密码必须大于8位，包含数字、特殊字符")
 		return
 	}
-	ctx.String(http.StatusOK, "注册成功")
 
 	// 数据库操作
 	// 调用一下 service 的方法
@@ -94,10 +94,17 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
+	// 使用 errors.Is() 是最佳实践
+	if errors.Is(err, service.ErrUserDuplicateEmail) {
+		ctx.String(http.StatusOK, "邮箱冲突")
+		return
+	}
 	if err != nil {
 		ctx.String(http.StatusOK, "系统异常")
 		return
 	}
+
+	ctx.String(http.StatusOK, "注册成功")
 }
 func (u *UserHandler) Login(ctx *gin.Context) {
 

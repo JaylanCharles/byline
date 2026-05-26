@@ -5,7 +5,10 @@ import (
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
 
 type UserService struct {
 	repo *repository.UserRepository
@@ -21,6 +24,11 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 // 为什么没有传递 *domain.User ？因为，1. 内容少 2. 传指针的话，还要判断==nil 3. 很大可能分配到栈上，没有逃逸问题
 func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	// 要考虑加密问题
+	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	u.Password = string(hash)
 	// 存起来
 	return svc.repo.Create(ctx, u)
 }
