@@ -127,12 +127,31 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	
+
 	// 登录成功了
 	sess := sessions.Default(ctx)
 	sess.Set("userId", user.Id)
-	sess.Save()
+	sess.Options(sessions.Options{
+		// 生产环境要将这两个参数开启
+		//Secure:   true, // 规定使用 https 协议
+		//HttpOnly: true, // 这个 cookie 只能被服务器通过 HTTP 请求读写，浏览器里的 JavaScript 不能访问它
+		MaxAge: 300, // 单位：秒
+	})
+	if err := sess.Save(); err != nil { // 设置一次加一个 cookie 在浏览器端可以看见，一次 save() 增加一个 cookie
+		panic(err)
+	}
+
 	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
+func (u *UserHandler) Logout(ctx *gin.Context) {
+	sess := sessions.Default(ctx)
+	sess.Options(sessions.Options{
+		MaxAge: -1,
+	})
+	sess.Save() // 设置一次加一个 cookie 在浏览器端可以看见，一次 save() 增加一个 cookie
+	ctx.String(http.StatusOK, "退出登录成功")
 	return
 }
 func (u *UserHandler) Edit(ctx *gin.Context) {
