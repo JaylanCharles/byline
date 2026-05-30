@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/JaylanCharles/byline/internal/domain"
@@ -9,6 +10,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // UserHandler 用来定义与用户有关的路由
@@ -38,7 +40,8 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
+	//ug.POST("/login", u.Login)
+	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.Profile)
 }
@@ -107,6 +110,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 
 	ctx.String(http.StatusOK, "注册成功")
 }
+
 func (u *UserHandler) Login(ctx *gin.Context) {
 	type LoginReq struct {
 		Email    string `json:"email"`
@@ -129,6 +133,7 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	}
 
 	// 登录成功了
+	// 方式一：session 机制实现登陆状态的初始化
 	sess := sessions.Default(ctx)
 	sess.Set("userId", user.Id)
 	sess.Options(sessions.Options{
@@ -145,7 +150,45 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	return
 }
 
+func (u *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	// 参数少，可以不使用 domain.User
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if errors.Is(err, service.ErrInvalidUserOrPassword) {
+		// 记录日志
+		ctx.String(http.StatusOK, "用户名或密码不对")
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	// 方式二：使用 JWT 实现登陆状态的初始化
+	token := jwt.New(jwt.SigningMethodHS512)
+	// 这个字符串 vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr 是 JWT 的签名密钥(secret key)
+	tokenStr, err := token.SignedString([]byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"))
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	// 学习的过程是探索的过程，可以先自己将 tokenStr 打印出来看看，然后再弄后面的东西
+	// ctx.Header() 直接操控响应头的内容！ 所以说 ctx 是一次请求的上下文
+	ctx.Header("x-jwt-token", tokenStr)
+	fmt.Println(user)
+	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
 func (u *UserHandler) Logout(ctx *gin.Context) {
+	// 使用 session 实现登出
 	sess := sessions.Default(ctx)
 	sess.Options(sessions.Options{
 		MaxAge: -1,
@@ -154,6 +197,7 @@ func (u *UserHandler) Logout(ctx *gin.Context) {
 	ctx.String(http.StatusOK, "退出登录成功")
 	return
 }
+
 func (u *UserHandler) Edit(ctx *gin.Context) {
 
 }

@@ -10,8 +10,6 @@ import (
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -52,9 +50,11 @@ func InitWebServer() *gin.Engine {
 		//AllowOrigins:  []string{"http://localhost:3000/"},
 		// 不写这行，表示全部都允许
 		//AllowMethods:  []string{"POST", "PATCH"},
+		// 表示允许客户端哪些可以过来
 		AllowHeaders: []string{"Content-Type", "Authorization"},
 		// 这行配置不懂，后面jwt中能用起来
-		//ExposeHeaders: []string{"Content-Length"},
+		// 这行配置的意思是：将服务器端的 header 暴露给前端，允许前端得到这个
+		ExposeHeaders: []string{"x-jwt-token"},
 		// 是否允许带上 cookie 之类的
 		AllowCredentials: true,
 		// 这种方式推荐推荐
@@ -68,18 +68,24 @@ func InitWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}))
 
+	// 方式一：使用 session 方式进行登录验证
 	// cookie 是可以换成 redis 的
-	store, err := redis.NewStore(16,
-		"tcp", "localhost:6379",
-		"", "",
-		[]byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"),
-		[]byte("WgK8Rmob6C5b2PCixdcERXXAzj4wAw7Y"))
-	if err != nil {
-		panic(err)
-	}
+	//store, err := redis.NewStore(16,
+	//	"tcp", "localhost:6379",
+	//	"", "",
+	//	[]byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"),
+	//	[]byte("WgK8Rmob6C5b2PCixdcERXXAzj4wAw7Y"))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//server.Use(sessions.Sessions("mysession", store))
+	//server.Use(middleware.NewLoginMiddlewareBuilder().
+	//	IgorePaths("/users/signup").
+	//	IgorePaths("/users/login").
+	//	Build())
 
-	server.Use(sessions.Sessions("mysession", store))
-	server.Use(middleware.NewLoginMiddlewareBuilder().
+	// 方式二：使用 JWT 方式进行登陆验证
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
 		IgorePaths("/users/signup").
 		IgorePaths("/users/login").
 		Build())
