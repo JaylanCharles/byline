@@ -24,7 +24,10 @@ func main() {
 	u := InitUser(db)
 	u.RegisterRoutes(server)
 
-	server.Run(":8080")
+	err := server.Run(":8080")
+	if err != nil {
+		return
+	}
 }
 
 func InitDB() *gorm.DB {
@@ -87,7 +90,7 @@ func InitWebServer() *gin.Engine {
 	//	panic(err)
 	//}
 	//server.Use(sessions.Sessions("mysession", store))
-	//server.Use(middlewares.NewLoginMiddlewareBuilder().
+	//server.Use(middleware.NewLoginMiddlewareBuilder().
 	//	IgorePaths("/users/signup").
 	//	IgorePaths("/users/login").
 	//	Build())

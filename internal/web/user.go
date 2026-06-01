@@ -178,7 +178,8 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
 		},
-		Uid: user.Id,
+		Uid:       user.Id,
+		UserAgent: ctx.Request.UserAgent(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	// 这个字符串 vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr 是 JWT 的签名密钥(secret key)
@@ -231,5 +232,6 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 type UserClaims struct {
 	jwt.RegisteredClaims
 	// 声明自己要放进 token 里的数据
-	Uid int64
+	Uid       int64
+	UserAgent string
 }
