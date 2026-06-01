@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
@@ -172,7 +173,14 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	}
 
 	// 方式二：使用 JWT 实现登陆状态的初始化
-	token := jwt.New(jwt.SigningMethodHS512)
+	// 这里不使用指针的原因是，不需要进行修改值，仅仅需要传递一下就可以
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+		Uid: user.Id,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	// 这个字符串 vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr 是 JWT 的签名密钥(secret key)
 	tokenStr, err := token.SignedString([]byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"))
 	if err != nil {
@@ -202,5 +210,26 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 
 }
 func (u *UserHandler) Profile(ctx *gin.Context) {
+	ctx.String(http.StatusOK, "这是user/profile")
+}
+func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
+	// 有一个需求：需要使用 userId 之前是可以通过session的ctx获取，现在使用JWT之后，有新的方式
+	// 不要想着重新解析一遍 token，可以直接在前面解析完，直接在 ctx 中塞一个
+	c, ok := ctx.Get("claims") // 获取的是 any 类型
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+	}
+	// 这种能返回错误的自己写的时候一定要养成习惯，要习惯处理
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+	}
+	println(claims.Uid)
+	// 其他 profile 代码
+}
 
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声明自己要放进 token 里的数据
+	Uid int64
 }
