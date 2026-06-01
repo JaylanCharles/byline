@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: byline
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: byline
+  template:
+    metadata:
+      labels:
+        app: byline
+    spec:
+      containers:
+        - name: byline
+          image: jaylancharles/byline:v0.0.4
+          ports:
+            - containerPort: 8080
