@@ -1,0 +1,15 @@
+# pvc => PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # 这是指 mysql 要用的东西，但是 k8s 用什么呢？ PersistentVolume
+  name: byline-mysql-claim
+spec:
+  # 这个可以随便写
+  storageClassName: manual
+  accessModes:
+    # 一个 pod 使用
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

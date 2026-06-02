@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: byline-mysql
+  labels:
+    app: byline-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: byline-mysql
+  template:
+    metadata:
+      name: byline-mysql
+      labels:
+        app: byline-mysql
+    spec:
+      containers:
+        - name: byline-mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            # 这里一定要对应到 mysql 数据存储的位置
+            # mysql 的配置文件可以改这个路径，这是属于 mysql 容器本身的范畴
+            - mountPath: /var/lib/mysql
+              # POD 里面那么多到底用哪一个
+              name: mysql-storage
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+      restartPolicy: Always
+      # 整个 POD 有哪些卷
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: byline-mysql-claim
