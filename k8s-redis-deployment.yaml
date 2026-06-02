@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: byline-redis
+  labels:
+    app: byline-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: byline-redis
+  template:
+    metadata:
+      name: byline-redis
+      labels:
+        app: byline-redis
+    spec:
+      containers:
+        - name: byline-redis
+          image: redis:latest
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      
