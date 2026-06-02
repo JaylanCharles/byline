@@ -1,10 +1,10 @@
 package main
 
 import (
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/JaylanCharles/byline/config"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/internal/service"
@@ -19,17 +19,11 @@ import (
 )
 
 func main() {
-	//db := InitDB()
+	db := InitDB()
 
-	//server := InitWebServer()
-	//u := InitUser(db)
-	//u.RegisterRoutes(server)
-
-	server := gin.Default()
-
-	server.GET("/hello", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "你好，nb")
-	})
+	server := InitWebServer()
+	u := InitUser(db)
+	u.RegisterRoutes(server)
 
 	err := server.Run(":8080")
 	if err != nil {
@@ -38,7 +32,7 @@ func main() {
 }
 
 func InitDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/byline"))
+	db, err := gorm.Open(mysql.Open(config.Config.DB.DSN))
 	// 只会在初始化过程中使用 panic
 	// panic 相当于整个 goroutine 结束
 	// 一旦初始化过程出错，应用就不要启动了
@@ -57,7 +51,7 @@ func InitWebServer() *gin.Engine {
 	server := gin.Default()
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: config.Config.Redis.Addr,
 	})
 	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 

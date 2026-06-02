@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: byline
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: jaylan.byline.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: byline
+                port:
+                  number: 80
