@@ -176,7 +176,7 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	// 这里不使用指针的原因是，不需要进行修改值，仅仅需要传递一下就可以
 	claims := UserClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
 		Uid:       user.Id,
 		UserAgent: ctx.Request.UserAgent(),

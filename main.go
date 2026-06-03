@@ -10,10 +10,8 @@ import (
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
-	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -50,10 +48,11 @@ func InitDB() *gorm.DB {
 func InitWebServer() *gin.Engine {
 	server := gin.Default()
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: config.Config.Redis.Addr,
-	})
-	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
+	// 压测的话就先注释掉
+	//redisClient := redis.NewClient(&redis.Options{
+	//	Addr: config.Config.Redis.Addr,
+	//})
+	//server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 
 	// 作用于定义在server上的全部路由
 	// 怎么改？就看前端页面的请求对照着改
