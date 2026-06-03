@@ -4,7 +4,7 @@ package config
 
 var Config = config{
 	DB: DBConfig{
-		DSN: "localhost:13316",
+		DSN: "root:root@tcp(localhost:13316)/byline",
 	},
 	Redis: RedisConfig{
 		Addr: "localhost:6379",
