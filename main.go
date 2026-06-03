@@ -6,21 +6,24 @@ import (
 
 	"github.com/JaylanCharles/byline/config"
 	"github.com/JaylanCharles/byline/internal/repository"
+	"github.com/JaylanCharles/byline/internal/repository/cache"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func main() {
 	db := InitDB()
+	redisClient := InitRedis()
 
 	server := InitWebServer()
-	u := InitUser(db)
+	u := InitUser(db, redisClient)
 	u.RegisterRoutes(server)
 
 	err := server.Run(":8080")
@@ -45,10 +48,17 @@ func InitDB() *gorm.DB {
 	return db
 }
 
+func InitRedis() *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr: config.Config.Redis.Addr,
+	})
+}
+
 func InitWebServer() *gin.Engine {
 	server := gin.Default()
 
 	// 压测的话就先注释掉
+	// 提出去，使用InitRedis()
 	//redisClient := redis.NewClient(&redis.Options{
 	//	Addr: config.Config.Redis.Addr,
 	//})
@@ -104,9 +114,10 @@ func InitWebServer() *gin.Engine {
 	return server
 }
 
-func InitUser(db *gorm.DB) *web.UserHandler {
+func InitUser(db *gorm.DB, redisClient *redis.Client) *web.UserHandler {
 	ud := dao.NewUserDAO(db)
-	repo := repository.NewUserRepository(ud)
+	uc := cache.NewUserCache(redisClient) // 现在还没有注册 redis
+	repo := repository.NewUserRepository(ud, uc)
 	svc := service.NewUserService(repo)
 	//u := &web.UserHandler{}
 	u := web.NewUserHandler(svc)
