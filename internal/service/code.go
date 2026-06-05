@@ -20,6 +20,13 @@ type CodeService struct {
 	smsSvc sms.Service // 这是接口，所以不用指针
 }
 
+func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service) *CodeService {
+	return &CodeService{
+		repo:   repo,
+		smsSvc: smsSvc,
+	}
+}
+
 func (svc *CodeService) Send(ctx context.Context, biz, phone string) error {
 	// biz 用于区分业务场景
 	// 生成验证码
