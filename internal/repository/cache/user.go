@@ -14,7 +14,12 @@ import (
 // var ErrKeyNotExist = errors.New("key 不存在")
 // var ErrKeyNotExist = redis.Nil
 
-type UserCache struct {
+type UserCache interface {
+	Get(ctx context.Context, id int64) (domain.User, error)
+	Set(ctx context.Context, u domain.User) error
+}
+
+type RedisUserCache struct {
 	client redis.Cmdable
 	// 过期时间
 	expiration time.Duration
@@ -23,16 +28,16 @@ type UserCache struct {
 // A 用到了 B，B 一定是接口
 // A 用到了 B，B 一定是字段
 // A 用到了 B，A 绝对不初始化 B，而是外面注入
-func NewUserCache(cmd redis.Cmdable) *UserCache {
-	return &UserCache{
+func NewUserCache(cmd redis.Cmdable) UserCache {
+	return &RedisUserCache{
 		client:     cmd,
 		expiration: time.Minute * 15,
 	}
 }
 
 // 如果没有数据，返回一个特定的 error
-func (cache *UserCache) Get(ctx context.Context, id int64) (domain.User, error) {
-	key := cache.Key(id)
+func (cache *RedisUserCache) Get(ctx context.Context, id int64) (domain.User, error) {
+	key := cache.key(id)
 	// 数据不存在，err = redis.Nil
 	val, err := cache.client.Get(ctx, key).Bytes()
 	if err != nil {
@@ -43,15 +48,15 @@ func (cache *UserCache) Get(ctx context.Context, id int64) (domain.User, error) 
 	return u, err
 }
 
-func (cache *UserCache) Set(ctx context.Context, u domain.User) error {
+func (cache *RedisUserCache) Set(ctx context.Context, u domain.User) error {
 	val, err := json.Marshal(u)
 	if err != nil {
 		return err
 	}
-	key := cache.Key(u.Id)
+	key := cache.key(u.Id)
 	return cache.client.Set(ctx, key, val, cache.expiration).Err()
 }
 
-func (cache *UserCache) Key(id int64) string {
+func (cache *RedisUserCache) key(id int64) string {
 	return fmt.Sprintf("user:info:%d", id)
 }
