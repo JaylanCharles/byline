@@ -1,0 +1,60 @@
+package ioc
+
+import (
+	"strings"
+	"time"
+
+	"github.com/JaylanCharles/byline/internal/web"
+	"github.com/JaylanCharles/byline/internal/web/middleware"
+	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/ratelimit"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+)
+
+// 这个方法一定是不稳定的，意思就是以后可能经常改，这是不可避免的
+func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler) *gin.Engine {
+	server := gin.Default()
+	server.Use(mdls...)
+	hdl.RegisterRoutes(server)
+	return server
+}
+
+// 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
+func InitMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
+	return []gin.HandlerFunc{
+		coresHdl(),
+		middleware.NewLoginJWTMiddlewareBuilder().
+			IgorePaths("/users/signup").
+			IgorePaths("/users/login_sms/code/send").
+			IgorePaths("/users/login_sms").
+			IgorePaths("/users/login").
+			Build(),
+		ratelimit.NewBuilder(redisClient, time.Second, 100).Build(),
+	}
+}
+
+func coresHdl() gin.HandlerFunc {
+	return cors.New(cors.Config{
+		// 公司中最好直接指定网址
+		//AllowOrigins:  []string{"http://localhost:3000/"},
+		// 不写这行，表示全部都允许
+		//AllowMethods:  []string{"POST", "PATCH"},
+		// 表示允许客户端哪些可以过来
+		AllowHeaders: []string{"Content-Type", "Authorization"},
+		// 这行配置不懂，后面jwt中能用起来
+		// 这行配置的意思是：将服务器端的 header 暴露给前端，允许前端得到这个
+		ExposeHeaders: []string{"x-jwt-token"},
+		// 是否允许带上 cookie 之类的
+		AllowCredentials: true,
+		// 这种方式推荐推荐
+		AllowOriginFunc: func(origin string) bool {
+			if strings.HasPrefix(origin, "http://localhost") {
+				// 开发环境
+				return true
+			}
+			return strings.Contains(origin, "company.com")
+		},
+		MaxAge: 12 * time.Hour,
+	})
+}
