@@ -9,6 +9,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/repository/cache"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/internal/service"
+	"github.com/JaylanCharles/byline/internal/service/sms/memory"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/gin-contrib/cors"
@@ -108,6 +109,8 @@ func InitWebServer() *gin.Engine {
 	// 方式二：使用 JWT 方式进行登陆验证
 	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
 		IgorePaths("/users/signup").
+		IgorePaths("/users/login_sms/code/send").
+		IgorePaths("/users/login_sms").
 		IgorePaths("/users/login").
 		Build())
 
@@ -119,7 +122,12 @@ func InitUser(db *gorm.DB, redisClient *redis.Client) *web.UserHandler {
 	uc := cache.NewUserCache(redisClient) // 现在还没有注册 redis
 	repo := repository.NewUserRepository(ud, uc)
 	svc := service.NewUserService(repo)
+
+	codeCache := cache.NewCodeCache(redisClient)
+	codeRepo := repository.NewCodeRepository(codeCache)
+	smsSvc := memory.NewService()
+	codeSvc := service.NewCodeService(codeRepo, smsSvc)
 	//u := &web.UserHandler{}
-	u := web.NewUserHandler(svc)
+	u := web.NewUserHandler(svc, codeSvc)
 	return u
 }

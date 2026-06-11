@@ -14,10 +14,22 @@ import (
 // 可以做成可配置的，但是没意义，因为好几年都不变
 const codeTplId = "xxxxx" // 自己的 id
 
+var (
+	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
+	ErrCodeSendTooMany        = repository.ErrCodeSendTooMany
+)
+
 type CodeService struct {
 	repo *repository.CodeRepository // 这是结构体，所以指针
 	//codeTplId string
 	smsSvc sms.Service // 这是接口，所以不用指针
+}
+
+func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service) *CodeService {
+	return &CodeService{
+		repo:   repo,
+		smsSvc: smsSvc,
+	}
 }
 
 func (svc *CodeService) Send(ctx context.Context, biz, phone string) error {

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrUserDuplicateEmail    = repository.ErrUserDuplicateEmail
+	ErrUserDuplicate         = repository.ErrUserDuplicate
 	ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 )
 
@@ -54,4 +54,34 @@ func (svc *UserService) Login(ctx context.Context, email, password string) (doma
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
 	return u, nil
+}
+
+func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	// 有人认为可以不用写这行以及“判断有没有这个用户”逻辑。
+	// 但是如果你不写，所有的请求都到下面了，database 受不了；
+	// 如果你写了，可能 10w 请求，只有 1w 到 database
+	// 业务研发的时候，经常遇到，这个部分就是快路径
+	u, err := svc.repo.FindByPhone(ctx, phone)
+
+	// 判断有没有这个用户
+	if !errors.Is(err, repository.ErrUserNotFound) {
+		// nil 会进来这里
+		// 不为 ErrUserNotFound 的也会进来这里
+		return u, err
+	}
+
+	// 这就是 慢路径
+	// 在系统资源不足，触发降级之后，不执行慢路经
+	u = domain.User{
+		Phone: phone,
+	}
+	// 没有这个用户的话
+	err = svc.repo.Create(ctx, u)
+
+	if err != nil && err != repository.ErrUserDuplicate {
+		return u, err
+	}
+
+	// 这里会遇到主从延迟的问题
+	return svc.repo.FindByPhone(ctx, phone)
 }

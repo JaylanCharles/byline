@@ -14,14 +14,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const biz = "login"
+
 // UserHandler 用来定义与用户有关的路由
 type UserHandler struct {
 	svc         *service.UserService
+	codeSvc     *service.CodeService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
@@ -35,6 +38,7 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
 		svc:         svc,
+		codeSvc:     codeSvc,
 	}
 }
 
@@ -45,6 +49,98 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.Profile)
+	// 也可以这样定义，但是无所谓，为的是让别人看得懂就可以
+	// PUT "/login/sms/code" 发验证码
+	// POST "/login/sms/code" 校验验证码
+	ug.POST("/login_sms/code/send", u.SendLoginSMSCode)
+	ug.POST("/login_sms", u.LoginSMS)
+}
+func (u *UserHandler) LoginSMS(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	ok, err := u.codeSvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码有误",
+		})
+		return
+	}
+
+	// 手机号验证之后，登录态设置
+	// 需要得知 uid
+	// 有可能是新用户
+	user, err := u.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+		return
+	}
+
+	if err = u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "验证码校验通过",
+	})
+}
+
+func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// 是不是一个合法的手机号码
+	// 考虑使用正则表达式
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "输入有误",
+		})
+		return
+	}
+
+	err := u.codeSvc.Send(ctx, biz, req.Phone)
+	switch {
+	case err == nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+	case errors.Is(err, service.ErrCodeSendTooMany):
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送太频繁，请稍后再试",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+	}
 }
 
 // 这里入参使用ctx *gin.Context 而不是 使用server *gin.Engine
@@ -100,7 +196,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		Password: req.Password,
 	})
 	// 使用 errors.Is() 是最佳实践
-	if errors.Is(err, service.ErrUserDuplicateEmail) {
+	if errors.Is(err, service.ErrUserDuplicate) {
 		ctx.String(http.StatusOK, "邮箱冲突")
 		return
 	}
@@ -172,28 +268,35 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		return
 	}
 
+	if err = u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	fmt.Println(user)
+	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
+func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
 	// 方式二：使用 JWT 实现登陆状态的初始化
 	// 这里不使用指针的原因是，不需要进行修改值，仅仅需要传递一下就可以
 	claims := UserClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
-		Uid:       user.Id,
+		Uid:       uid,
 		UserAgent: ctx.Request.UserAgent(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	// 这个字符串 vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr 是 JWT 的签名密钥(secret key)
 	tokenStr, err := token.SignedString([]byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"))
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统错误")
-		return
+		return err
 	}
 	// 学习的过程是探索的过程，可以先自己将 tokenStr 打印出来看看，然后再弄后面的东西
 	// ctx.Header() 直接操控响应头的内容！ 所以说 ctx 是一次请求的上下文
 	ctx.Header("x-jwt-token", tokenStr)
-	fmt.Println(user)
-	ctx.String(http.StatusOK, "登录成功")
-	return
+	return nil
 }
 
 func (u *UserHandler) Logout(ctx *gin.Context) {
