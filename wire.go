@@ -35,7 +35,7 @@ func InitWebServer() *gin.Engine {
 		web.NewUserHandler,
 
 		ioc.InitMiddlewares,
-		InitWebServer,
+		ioc.InitWebServer,
 	)
 	return new(gin.Engine) // 没有什么作用，就是单纯让语法不出错
 }

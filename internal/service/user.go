@@ -14,19 +14,25 @@ var (
 	ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 )
 
-type UserService struct {
-	repo *repository.UserRepository
+type UserService interface {
+	SignUp(ctx context.Context, u domain.User) error
+	Login(ctx context.Context, email, password string) (domain.User, error)
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{
+type EUserService struct {
+	repo repository.UserRepository
+}
+
+func NewUserService(repo repository.UserRepository) UserService {
+	return &EUserService{
 		repo: repo,
 	}
 }
 
 // 无论是什么函数，好习惯是不知道返回什么或者没有具体的要返回，都要返回 error
 // 为什么没有传递 *domain.User ？因为，1. 内容少 2. 传指针的话，还要判断==nil 3. 很大可能分配到栈上，没有逃逸问题
-func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *EUserService) SignUp(ctx context.Context, u domain.User) error {
 	// 要考虑加密问题
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -37,7 +43,7 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	return svc.repo.Create(ctx, u)
 }
 
-func (svc *UserService) Login(ctx context.Context, email, password string) (domain.User, error) {
+func (svc *EUserService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	// 先找用户
 	u, err := svc.repo.FindByEmail(ctx, email)
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -56,7 +62,7 @@ func (svc *UserService) Login(ctx context.Context, email, password string) (doma
 	return u, nil
 }
 
-func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (svc *EUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	// 有人认为可以不用写这行以及“判断有没有这个用户”逻辑。
 	// 但是如果你不写，所有的请求都到下面了，database 受不了；
 	// 如果你写了，可能 10w 请求，只有 1w 到 database
