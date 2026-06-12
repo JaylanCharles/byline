@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrUserDuplicate = dao.ErrUserDuplicateEmail
+	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
 	// 这样处理，让 service 层不知道 dao 层使用的是 gorm
 	ErrUserNotFound = dao.ErrUserNotFound
 )
