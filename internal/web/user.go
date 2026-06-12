@@ -197,7 +197,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		Password: req.Password,
 	})
 	// 使用 errors.Is() 是最佳实践
-	if errors.Is(err, service.ErrUserDuplicate) {
+	if errors.Is(err, service.ErrUserDuplicateEmail) {
 		ctx.String(http.StatusOK, "邮箱冲突")
 		return
 	}
