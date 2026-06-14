@@ -139,7 +139,7 @@ func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 	default:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
-			Msg:  "系统异常",
+			Msg:  "系统错误",
 		})
 	}
 }
