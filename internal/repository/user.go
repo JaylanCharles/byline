@@ -73,11 +73,11 @@ func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.U
 	// 找到了回写 cache
 	// 不开 goroutine 数据一致性也很严重，因为你用了缓存，数据一定是不一致的
 	go func() {
-		err = r.cache.Set(ctx, u)
-		if err != nil {
-			// 缓存设置失败是偶发性问题。但是就怕 redis 崩掉了
-			// 打日志，做监控
-		}
+		_ = r.cache.Set(ctx, u)
+		//if err != nil {
+		//	// 缓存设置失败是偶发性问题。但是就怕 redis 崩掉了
+		//	// 打日志，做监控
+		//}
 	}()
 
 	return u, err
