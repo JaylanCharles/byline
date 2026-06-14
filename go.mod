@@ -3,6 +3,7 @@ module github.com/JaylanCharles/byline
 go 1.26.2
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/ecodeclub/ekit v0.0.10
 	github.com/gin-contrib/cors v1.7.7
