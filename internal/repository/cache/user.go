@@ -12,7 +12,7 @@ import (
 
 // 规范的写法是这样，但是我们这个系统以后的很长时间内都是用 redis,所以可以偷懒
 // var ErrKeyNotExist = errors.New("key 不存在")
-// var ErrKeyNotExist = redis.Nil
+var ErrKeyNotExist = redis.Nil
 
 type UserCache interface {
 	Get(ctx context.Context, id int64) (domain.User, error)
