@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/JaylanCharles/byline/pkg/ratelimit"
 	"github.com/ecodeclub/ekit/slice"
 	sms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
 )
@@ -12,13 +13,15 @@ type Service struct {
 	appId    *string // 传入指针的原因是，设计的参数要传入指针，垃圾设计
 	signName *string
 	client   *sms.Client
+	limiter  ratelimit.Limiter
 }
 
-func NewService(client *sms.Client, signName string, appId string) *Service {
+func NewService(client *sms.Client, signName string, appId string, limiter ratelimit.Limiter) *Service {
 	return &Service{
 		appId:    new(appId),
 		signName: new(signName),
 		client:   client,
+		limiter:  limiter,
 	}
 }
 func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {
