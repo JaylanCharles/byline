@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type JWTHandler struct {
@@ -20,11 +21,13 @@ type UserClaims struct {
 	// 声明自己要放进 token 里的数据
 	Uid       int64
 	UserAgent string
+	Ssid      string
 }
 
 type RefreshClaims struct {
 	jwt.RegisteredClaims
-	Uid int64
+	Ssid string
+	Uid  int64
 }
 
 // newJwtHandler 小写代表这是内部的，就是不希望外面人能调用
@@ -34,7 +37,23 @@ func newJwtHandler() JWTHandler {
 		rtKey: []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"),
 	}
 }
-func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64) error {
+
+func (j JWTHandler) setLoginToken(ctx *gin.Context, uid int64) error {
+	// 这里用长的 uuid
+	ssid := uuid.New().String()
+	err := j.setJWTToken(ctx, uid, ssid)
+	if err != nil {
+		return err
+	}
+
+	err = j.setRefreshToken(ctx, uid, ssid)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64, ssid string) error {
 	// 方式二：使用 JWT 实现登陆状态的初始化
 	// 这里不使用指针的原因是，不需要进行修改值，仅仅需要传递一下就可以
 	claims := UserClaims{
@@ -42,6 +61,7 @@ func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64) error {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
 		Uid:       uid,
+		Ssid:      ssid,
 		UserAgent: ctx.Request.UserAgent(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
@@ -67,12 +87,13 @@ func ExtractToken(ctx *gin.Context) string {
 	return segs[1]
 }
 
-func (j JWTHandler) setRefreshToken(ctx *gin.Context, uid int64) error {
+func (j JWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid string) error {
 	claims := RefreshClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 7)),
 		},
-		Uid: uid,
+		Uid:  uid,
+		Ssid: ssid,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
