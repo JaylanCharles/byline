@@ -6,17 +6,17 @@ import (
 
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
-	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )
 
 // 这个方法一定是不稳定的，意思就是以后可能经常改，这是不可避免的
-func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler) *gin.Engine {
+func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl *web.OAuth2WechatHandler) *gin.Engine {
 	server := gin.Default()
 	server.Use(mdls...)
 	hdl.RegisterRoutes(server)
+	oauth2WechatHdl.RegisterRoutes(server)
 	return server
 }
 
@@ -28,9 +28,11 @@ func InitMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 			IgorePaths("/users/signup").
 			IgorePaths("/users/login_sms/code/send").
 			IgorePaths("/users/login_sms").
+			IgorePaths("/oauth2/wechat/authurl").
+			IgorePaths("/oauth2/wechat/callback").
 			IgorePaths("/users/login").
 			Build(),
-		ratelimit.NewBuilder(redisClient, time.Second, 100).Build(),
+		//ratelimit.NewBuilder(redisClient, time.Second, 100).Build(),
 	}
 }
 

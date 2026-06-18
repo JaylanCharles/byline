@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
@@ -13,7 +14,8 @@ import (
 var (
 	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
 	// 这样处理，让 service 层不知道 dao 层使用的是 gorm
-	ErrUserNotFound = dao.ErrUserNotFound
+	ErrUserNotFound  = dao.ErrUserNotFound
+	ErrDuplicateUser = errors.New("用户重复")
 )
 
 type UserRepository interface {
@@ -21,6 +23,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	Create(ctx context.Context, u domain.User) error
 	FindById(ctx context.Context, id int64) (domain.User, error)
+	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
 // CachedUserRepository 意思是这个是有缓存的
@@ -89,7 +92,11 @@ func (r *CachedUserRepository) entityToDomain(u dao.User) domain.User {
 		Email:    u.Email.String,
 		Password: u.Password,
 		Phone:    u.Phone.String,
-		Ctime:    time.UnixMilli(u.Ctime),
+		WechatInfo: domain.WechatInfo{
+			UnionId: u.WechatUnionID.String,
+			OpenId:  u.WechatOpenID.String,
+		},
+		Ctime: time.UnixMilli(u.Ctime),
 	}
 }
 func (r *CachedUserRepository) domainToEntity(u domain.User) dao.User {
@@ -103,7 +110,23 @@ func (r *CachedUserRepository) domainToEntity(u domain.User) dao.User {
 			String: u.Phone,
 			Valid:  u.Phone != "",
 		},
+		WechatOpenID: sql.NullString{
+			String: u.WechatInfo.OpenId,
+			Valid:  u.WechatInfo.OpenId != "",
+		},
+		WechatUnionID: sql.NullString{
+			String: u.WechatInfo.UnionId,
+			Valid:  u.WechatInfo.UnionId != "",
+		},
 		Password: u.Password,
 		Ctime:    u.Ctime.UnixMilli(),
 	}
+}
+
+func (r *CachedUserRepository) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
+	ue, err := r.dao.FindByWechat(ctx, openId)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.entityToDomain(ue), nil
 }

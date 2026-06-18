@@ -18,21 +18,22 @@ type UserService interface {
 	SignUp(ctx context.Context, u domain.User) error
 	Login(ctx context.Context, email, password string) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error)
 }
 
-type EUserService struct {
+type userService struct {
 	repo repository.UserRepository
 }
 
 func NewUserService(repo repository.UserRepository) UserService {
-	return &EUserService{
+	return &userService{
 		repo: repo,
 	}
 }
 
 // 无论是什么函数，好习惯是不知道返回什么或者没有具体的要返回，都要返回 error
 // 为什么没有传递 *domain.User ？因为，1. 内容少 2. 传指针的话，还要判断==nil 3. 很大可能分配到栈上，没有逃逸问题
-func (svc *EUserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
 	// 要考虑加密问题
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -43,7 +44,7 @@ func (svc *EUserService) SignUp(ctx context.Context, u domain.User) error {
 	return svc.repo.Create(ctx, u)
 }
 
-func (svc *EUserService) Login(ctx context.Context, email, password string) (domain.User, error) {
+func (svc *userService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	// 先找用户
 	u, err := svc.repo.FindByEmail(ctx, email)
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -62,7 +63,7 @@ func (svc *EUserService) Login(ctx context.Context, email, password string) (dom
 	return u, nil
 }
 
-func (svc *EUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	// 有人认为可以不用写这行以及“判断有没有这个用户”逻辑。
 	// 但是如果你不写，所有的请求都到下面了，database 受不了；
 	// 如果你写了，可能 10w 请求，只有 1w 到 database
@@ -84,10 +85,26 @@ func (svc *EUserService) FindOrCreate(ctx context.Context, phone string) (domain
 	// 没有这个用户的话
 	err = svc.repo.Create(ctx, u)
 
-	if err != nil && err != repository.ErrUserDuplicateEmail {
+	if err != nil && !errors.Is(err, repository.ErrUserDuplicateEmail) {
 		return u, err
 	}
 
 	// 这里会遇到主从延迟的问题
 	return svc.repo.FindByPhone(ctx, phone)
+}
+
+func (svc *userService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
+	u, err := svc.repo.FindByWechat(ctx, wechatInfo.OpenId)
+	if !errors.Is(err, repository.ErrUserNotFound) {
+		return u, err
+	}
+	// 这边就是意味着是一个新用户
+	// JSON 格式的 wechatInfo
+	err = svc.repo.Create(ctx, domain.User{
+		WechatInfo: wechatInfo,
+	})
+	if err != nil && !errors.Is(err, repository.ErrDuplicateUser) {
+		return domain.User{}, err
+	}
+	return svc.repo.FindByWechat(ctx, wechatInfo.OpenId)
 }
