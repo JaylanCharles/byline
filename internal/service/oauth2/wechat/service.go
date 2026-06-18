@@ -8,12 +8,11 @@ import (
 	"net/url"
 
 	"github.com/JaylanCharles/byline/internal/domain"
-	uuid "github.com/lithammer/shortuuid/v4"
 )
 
 type Service interface {
-	AuthURL(ctx context.Context) (string, error)
-	VerifyCode(ctx context.Context, state, code string) (domain.WechatInfo, error)
+	AuthURL(ctx context.Context, state string) (string, error)
+	VerifyCode(ctx context.Context, code string) (domain.WechatInfo, error)
 }
 
 // 改成自己的并且为了方便调试，修改 hosts 文件
@@ -34,13 +33,11 @@ func NewService(appID string, appSecret string) Service {
 	}
 }
 
-func (s *service) AuthURL(ctx context.Context) (string, error) {
+func (s *service) AuthURL(ctx context.Context, state string) (string, error) {
 	const authURLPattern = "https://open.weixin.qq.com/connect/qrconnect?appid=%s&redirect_uri=%s&response_type=code&scope=snsapi_login&state=%s#wechat_redirect"
-	// uuid 使用短的，为什么不用长的，因为太长了
-	state := uuid.New()
 	return fmt.Sprintf(authURLPattern, s.appID, redirectURL, state), nil
 }
-func (s *service) VerifyCode(ctx context.Context, state, code string) (domain.WechatInfo, error) {
+func (s *service) VerifyCode(ctx context.Context, code string) (domain.WechatInfo, error) {
 	accessTokenUrl := fmt.Sprintf(`https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code`,
 		s.appID, s.appSecret, code)
 

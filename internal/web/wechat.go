@@ -1,22 +1,33 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/service/oauth2/wechat"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	uuid "github.com/lithammer/shortuuid/v4"
 )
 
 type OAuth2WechatHandler struct {
-	svc     wechat.Service
-	userSvc service.UserService
+	svc             wechat.Service
+	userSvc         service.UserService
+	stateKey        []byte
+	stateCookieName string
 	jwtHandler
 }
 
-func NewOAuth2WechatHandler(svc wechat.Service) *OAuth2WechatHandler {
+func NewOAuth2WechatHandler(svc wechat.Service, userSvc service.UserService) *OAuth2WechatHandler {
 	return &OAuth2WechatHandler{
-		svc: svc,
+		svc:     svc,
+		userSvc: userSvc,
+		// 这些数据我们写死就可以，不需要进行依赖注入
+		// 不同的地方换一换 key, 防止人家攻破一个地方，所有地方都被攻破
+		stateKey:        []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgB"),
+		stateCookieName: "jwt-state",
 	}
 }
 
@@ -27,7 +38,10 @@ func (h *OAuth2WechatHandler) RegisterRoutes(server *gin.Engine) {
 }
 
 func (h *OAuth2WechatHandler) Auth2URL(ctx *gin.Context) {
-	url, err := h.svc.AuthURL(ctx)
+	// uuid 使用短的，为什么不用长的，因为太长了
+	state := uuid.New()
+
+	url, err := h.svc.AuthURL(ctx, state)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -35,16 +49,34 @@ func (h *OAuth2WechatHandler) Auth2URL(ctx *gin.Context) {
 		})
 		return
 	}
+
+	err = h.setStateCookie(ctx, state)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Msg:  "服务器异常",
+			Code: 5,
+		})
+	}
+
 	ctx.JSON(http.StatusOK, Result{
 		Data: url,
 	})
 }
 
 func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
+	err := h.verifyState(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Msg:  "非法请求",
+			Code: 4,
+		})
+		return
+	}
+
 	code := ctx.Query("code")
 	state := ctx.Query("state")
 
-	wechatInfo, err := h.svc.VerifyCode(ctx, state, code)
+	wechatInfo, err := h.svc.VerifyCode(ctx, code)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -76,4 +108,59 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "OK",
 	})
+}
+
+func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) error {
+	claims := StateClaims{
+		State: state,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 10)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+
+	tokenStr, err := token.SignedString(h.stateKey)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return err
+	}
+
+	ctx.SetCookie(h.stateCookieName, tokenStr, 600, "/oauth2/wechat/callback", "", false, true)
+
+	return nil
+}
+
+func (h *OAuth2WechatHandler) verifyState(ctx *gin.Context) error {
+	state := ctx.Query("state")
+
+	ck, err := ctx.Cookie(h.stateCookieName)
+	if err != nil {
+		// 妥妥的有人搞你
+		// 做好监控
+		return fmt.Errorf("无法获得 cookie %w", err)
+	}
+
+	var sc StateClaims
+	_, err = jwt.ParseWithClaims(ck, &sc, func(token *jwt.Token) (interface{}, error) {
+		return h.stateKey, nil
+	})
+	if err != nil {
+		return fmt.Errorf("解析 token 失败 %w", err)
+	}
+
+	if state != sc.State {
+		// state 不匹配，有人搞你
+		return fmt.Errorf("state 不匹配")
+	}
+
+	return nil
+}
+
+type StateClaims struct {
+	jwt.RegisteredClaims
+	State string
 }

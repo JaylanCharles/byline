@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
@@ -13,7 +14,8 @@ import (
 var (
 	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
 	// 这样处理，让 service 层不知道 dao 层使用的是 gorm
-	ErrUserNotFound = dao.ErrUserNotFound
+	ErrUserNotFound  = dao.ErrUserNotFound
+	ErrDuplicateUser = errors.New("用户重复")
 )
 
 type UserRepository interface {

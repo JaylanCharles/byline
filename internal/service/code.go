@@ -25,20 +25,20 @@ type CodeService interface {
 }
 
 // 不知道命名成什么了，E 表示这个是一个实例
-type ECodeService struct {
+type codeService struct {
 	repo repository.CodeRepository
 	//codeTplId string
 	smsSvc sms.Service // 这是接口，所以不用指针
 }
 
 func NewCodeService(repo repository.CodeRepository, smsSvc sms.Service) CodeService {
-	return &ECodeService{
+	return &codeService{
 		repo:   repo,
 		smsSvc: smsSvc,
 	}
 }
 
-func (svc *ECodeService) Send(ctx context.Context, biz, phone string) error {
+func (svc *codeService) Send(ctx context.Context, biz, phone string) error {
 	// biz 用于区分业务场景
 	// 生成验证码
 	code := svc.generateCode()
@@ -58,11 +58,11 @@ func (svc *ECodeService) Send(ctx context.Context, biz, phone string) error {
 	return err
 }
 
-func (svc *ECodeService) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }
 
-func (svc *ECodeService) generateCode() string {
+func (svc *codeService) generateCode() string {
 	num := rand.Intn(1000000) // 包含 0，不包含 1000000
 	// 不够六位补前导 0
 	return fmt.Sprintf("%06d", num)
