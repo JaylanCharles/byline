@@ -17,7 +17,7 @@ type OAuth2WechatHandler struct {
 	userSvc         service.UserService
 	stateKey        []byte
 	stateCookieName string
-	jwtHandler
+	JWTHandler
 }
 
 func NewOAuth2WechatHandler(svc wechat.Service, userSvc service.UserService) *OAuth2WechatHandler {
@@ -28,6 +28,7 @@ func NewOAuth2WechatHandler(svc wechat.Service, userSvc service.UserService) *OA
 		// 不同的地方换一换 key, 防止人家攻破一个地方，所有地方都被攻破
 		stateKey:        []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgB"),
 		stateCookieName: "jwt-state",
+		JWTHandler:      newJwtHandler(),
 	}
 }
 
@@ -74,7 +75,6 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	}
 
 	code := ctx.Query("code")
-	state := ctx.Query("state")
 
 	wechatInfo, err := h.svc.VerifyCode(ctx, code)
 	if err != nil {
@@ -97,6 +97,15 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	}
 
 	err = h.setJWTToken(ctx, user.Id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	err = h.setRefreshToken(ctx, user.Id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,

@@ -23,11 +23,12 @@ func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl
 // 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
 func InitMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		coresHdl(),
+		corsHdl(),
 		middleware.NewLoginJWTMiddlewareBuilder().
 			IgorePaths("/users/signup").
 			IgorePaths("/users/login_sms/code/send").
 			IgorePaths("/users/login_sms").
+			IgorePaths("/users/refresh_token").
 			IgorePaths("/oauth2/wechat/authurl").
 			IgorePaths("/oauth2/wechat/callback").
 			IgorePaths("/users/login").
@@ -36,7 +37,7 @@ func InitMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 	}
 }
 
-func coresHdl() gin.HandlerFunc {
+func corsHdl() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		// 公司中最好直接指定网址
 		//AllowOrigins:  []string{"http://localhost:3000/"},
@@ -46,7 +47,7 @@ func coresHdl() gin.HandlerFunc {
 		AllowHeaders: []string{"Content-Type", "Authorization"},
 		// 这行配置不懂，后面jwt中能用起来
 		// 这行配置的意思是：将服务器端的 header 暴露给前端，允许前端得到这个
-		ExposeHeaders: []string{"x-jwt-token"},
+		ExposeHeaders: []string{"x-jwt-token", "x-refresh-token"},
 		// 是否允许带上 cookie 之类的
 		AllowCredentials: true,
 		// 这种方式推荐推荐
