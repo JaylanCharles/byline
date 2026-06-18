@@ -18,6 +18,7 @@ type UserService interface {
 	SignUp(ctx context.Context, u domain.User) error
 	Login(ctx context.Context, email, password string) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error)
 }
 
 type EUserService struct {
@@ -90,4 +91,20 @@ func (svc *EUserService) FindOrCreate(ctx context.Context, phone string) (domain
 
 	// 这里会遇到主从延迟的问题
 	return svc.repo.FindByPhone(ctx, phone)
+}
+
+func (svc *EUserService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
+	u, err := svc.repo.FindByWechat(ctx, wechatInfo.OpenId)
+	if !errors.Is(err, repository.ErrUserNotFound) {
+		return u, err
+	}
+	// 这边就是意味着是一个新用户
+	// JSON 格式的 wechatInfo
+	err = svc.repo.Create(ctx, domain.User{
+		WechatInfo: wechatInfo,
+	})
+	if err != nil && err != repository.ErrDuplicateUser {
+		return domain.User{}, err
+	}
+	return svc.repo.FindByWechat(ctx, wechatInfo.OpenId)
 }

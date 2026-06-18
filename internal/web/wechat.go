@@ -3,12 +3,15 @@ package web
 import (
 	"net/http"
 
+	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/service/oauth2/wechat"
 	"github.com/gin-gonic/gin"
 )
 
 type OAuth2WechatHandler struct {
-	svc wechat.Service
+	svc     wechat.Service
+	userSvc service.UserService
+	jwtHandler
 }
 
 func NewOAuth2WechatHandler(svc wechat.Service) *OAuth2WechatHandler {
@@ -49,4 +52,28 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 		})
 		return
 	}
+
+	// 设置 jwttoken 需要拿到 uid
+	// 从 UserService 中拿，没有合适的方法，自己重新创建一个方法
+	user, err := h.userSvc.FindOrCreateByWechat(ctx, wechatInfo)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	err = h.setJWTToken(ctx, user.Id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
+	})
 }

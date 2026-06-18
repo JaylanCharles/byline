@@ -27,6 +27,9 @@ type User struct {
 	// Phone *string 这种方式也可以，但是不推荐，因为需要解引用，需要判空
 	Phone sql.NullString `gorm:"unique"`
 
+	WechatUnionID sql.NullString
+	WechatOpenID  sql.NullString `gorm:"unique"`
+
 	// 毫秒数，因为 time.Time 跟时区有关，很麻烦
 	Ctime int64
 	Utime int64
@@ -37,6 +40,7 @@ type UserDAO interface {
 	FindByEmail(ctx context.Context, email string) (User, error)
 	FindById(ctx context.Context, id int64) (User, error)
 	Insert(ctx context.Context, u User) error
+	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 
 type GORMUserDAO struct {
@@ -79,4 +83,10 @@ func (dao *GORMUserDAO) Insert(ctx context.Context, u User) error {
 		}
 	}
 	return err
+}
+
+func (dao *GORMUserDAO) FindByWechat(ctx context.Context, openId string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id=?", openId).First(&u).Error
+	return u, err
 }
