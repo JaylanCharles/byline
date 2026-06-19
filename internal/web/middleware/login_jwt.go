@@ -1,22 +1,22 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
-	"github.com/JaylanCharles/byline/internal/web"
+	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 )
 
 type LoginJWTMiddlewareBuilder struct {
 	paths []string
-	cmd   redis.Cmdable
+	ijwt.Handler
 }
 
-func NewLoginJWTMiddlewareBuilder() *LoginJWTMiddlewareBuilder {
-	return &LoginJWTMiddlewareBuilder{}
+func NewLoginJWTMiddlewareBuilder(jwtHdl ijwt.Handler) *LoginJWTMiddlewareBuilder {
+	return &LoginJWTMiddlewareBuilder{
+		Handler: jwtHdl,
+	}
 }
 
 func (l *LoginJWTMiddlewareBuilder) IgorePaths(path string) *LoginJWTMiddlewareBuilder {
@@ -33,9 +33,9 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 			}
 		}
 
-		tokenStr := web.ExtractToken(ctx)
+		tokenStr := l.ExtractToken(ctx)
 		// 这里使用指针的原因是， jwt.ParseWithClaims 中会获取 claims 将他赋值带出来
-		claims := &web.UserClaims{}
+		claims := &ijwt.UserClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
 			return []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"), nil
 		})
@@ -58,12 +58,11 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 			return
 		}
 
-		cnt, err := l.cmd.Exists(ctx, fmt.Sprintf("users:ssid:%s", claims.Ssid)).Result()
-		if err != nil || cnt > 0 {
+		err = l.CheckSession(ctx, claims.Ssid)
+		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-
 		ctx.Set("claims", claims)
 	}
 }

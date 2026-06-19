@@ -8,6 +8,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
+	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/ioc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -35,6 +36,7 @@ func InitWebServer() *gin.Engine {
 
 		web.NewUserHandler,
 		web.NewOAuth2WechatHandler,
+		ijwt.NewRedisJWTHandler,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

@@ -1,19 +1,24 @@
-package web
+package jwt
 
 import (
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
-type JWTHandler struct {
-	// access_token_key
-	atKey []byte
-	// refresh_token_key
-	rtKey []byte
+var (
+	AtKey = []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBa")
+	RtKey = []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr")
+)
+
+type RedisJWTHandler struct {
+	cmd redis.Cmdable
 }
 
 type UserClaims struct {
@@ -30,30 +35,13 @@ type RefreshClaims struct {
 	Uid  int64
 }
 
-// newJwtHandler 小写代表这是内部的，就是不希望外面人能调用
-func newJwtHandler() JWTHandler {
-	return JWTHandler{
-		atKey: []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBa"),
-		rtKey: []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"),
+func NewRedisJWTHandler(cmd redis.Cmdable) Handler {
+	return &RedisJWTHandler{
+		cmd: cmd,
 	}
 }
 
-func (j JWTHandler) setLoginToken(ctx *gin.Context, uid int64) error {
-	// 这里用长的 uuid
-	ssid := uuid.New().String()
-	err := j.setJWTToken(ctx, uid, ssid)
-	if err != nil {
-		return err
-	}
-
-	err = j.setRefreshToken(ctx, uid, ssid)
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64, ssid string) error {
+func (h *RedisJWTHandler) SetJWTToken(ctx *gin.Context, uid int64, ssid string) error {
 	// 方式二：使用 JWT 实现登陆状态的初始化
 	// 这里不使用指针的原因是，不需要进行修改值，仅仅需要传递一下就可以
 	claims := UserClaims{
@@ -66,7 +54,7 @@ func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64, ssid string) error 
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	// 这个字符串 vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr 是 JWT 的签名密钥(secret key)
-	tokenStr, err := token.SignedString(j.atKey)
+	tokenStr, err := token.SignedString(AtKey)
 	if err != nil {
 		return err
 	}
@@ -76,7 +64,7 @@ func (j JWTHandler) setJWTToken(ctx *gin.Context, uid int64, ssid string) error 
 	return nil
 }
 
-func ExtractToken(ctx *gin.Context) string {
+func (h *RedisJWTHandler) ExtractToken(ctx *gin.Context) string {
 	tokenHeader := ctx.GetHeader("Authorization")
 
 	segs := strings.Split(tokenHeader, " ")
@@ -87,7 +75,44 @@ func ExtractToken(ctx *gin.Context) string {
 	return segs[1]
 }
 
-func (j JWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid string) error {
+func (h *RedisJWTHandler) SetLoginToken(ctx *gin.Context, uid int64) error {
+	// 这里用长的 uuid
+	ssid := uuid.New().String()
+	err := h.SetJWTToken(ctx, uid, ssid)
+	if err != nil {
+		return err
+	}
+
+	err = h.setRefreshToken(ctx, uid, ssid)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (h *RedisJWTHandler) ClearToken(ctx *gin.Context) error {
+	ctx.Header("x-jwt-token", "")
+	ctx.Header("x-refresh-token", "")
+
+	c, ok := ctx.Get("claims") // 获取的是 any 类型
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+	}
+
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+	}
+
+	return h.cmd.Set(ctx, fmt.Sprintf("users:ssid:%s", claims.Ssid), "", time.Hour*24*7).Err()
+}
+
+func (h *RedisJWTHandler) CheckSession(ctx *gin.Context, ssid string) error {
+	_, err := h.cmd.Exists(ctx, fmt.Sprintf("users:ssid:%s", ssid)).Result()
+	return err
+}
+
+func (h *RedisJWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid string) error {
 	claims := RefreshClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 7)),
@@ -97,7 +122,7 @@ func (j JWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid string) er
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
-	tokenStr, err := token.SignedString(j.rtKey)
+	tokenStr, err := token.SignedString(RtKey)
 	if err != nil {
 		return err
 	}
