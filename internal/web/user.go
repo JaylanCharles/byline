@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
+	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -25,10 +25,10 @@ type UserHandler struct {
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 	cmd         redis.Cmdable
-	JWTHandler
+	ijwt.Handler
 }
 
-func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService, jwtHdl ijwt.Handler) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
@@ -43,7 +43,7 @@ func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserH
 		passwordExp: passwordExp,
 		svc:         svc,
 		codeSvc:     codeSvc,
-		JWTHandler:  newJwtHandler(),
+		Handler:     jwtHdl,
 	}
 }
 
@@ -100,7 +100,7 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 		return
 	}
 
-	if err = u.setLoginToken(ctx, user.Id); err != nil {
+	if err = u.SetLoginToken(ctx, user.Id); err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统异常",
@@ -275,7 +275,7 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 		return
 	}
 
-	if err = u.setLoginToken(ctx, user.Id); err != nil {
+	if err = u.SetLoginToken(ctx, user.Id); err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
@@ -315,7 +315,7 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 	}
 	// 这种能返回错误的自己写的时候一定要养成习惯，要习惯处理
-	claims, ok := c.(*UserClaims)
+	claims, ok := c.(*ijwt.UserClaims)
 	if !ok {
 		ctx.String(http.StatusOK, "系统错误")
 	}
@@ -326,11 +326,11 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 func (u *UserHandler) RefreshToken(ctx *gin.Context) {
 	// 约定，前端在 Authorization 里面带上这个 refresh_token
 	// 所以也就是说，只用调用这个接口的时候，Authorization 里面才是 refresh_token
-	tokenStr := ExtractToken(ctx)
+	tokenStr := u.ExtractToken(ctx)
 
-	var rc RefreshClaims
+	var rc ijwt.RefreshClaims
 	token, err := jwt.ParseWithClaims(tokenStr, &rc, func(token *jwt.Token) (interface{}, error) {
-		return u.rtKey, nil
+		return ijwt.RtKey, nil
 	})
 
 	if err != nil {
@@ -342,13 +342,13 @@ func (u *UserHandler) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	cnt, err := u.cmd.Exists(ctx, fmt.Sprintf("users:ssid:%s", rc.Ssid)).Result()
-	if err != nil || cnt > 0 {
+	err = u.CheckSession(ctx, rc.Ssid)
+	if err != nil {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	err = u.setJWTToken(ctx, rc.Uid, rc.Ssid)
+	err = u.SetJWTToken(ctx, rc.Uid, rc.Ssid)
 	if err != nil {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -360,20 +360,7 @@ func (u *UserHandler) RefreshToken(ctx *gin.Context) {
 }
 
 func (u *UserHandler) LogoutJWT(ctx *gin.Context) {
-	ctx.Header("x-jwt-token", "")
-	ctx.Header("x-refresh-token", "")
-	
-	c, ok := ctx.Get("claims") // 获取的是 any 类型
-	if !ok {
-		ctx.String(http.StatusOK, "系统错误")
-	}
-
-	claims, ok := c.(*UserClaims)
-	if !ok {
-		ctx.String(http.StatusOK, "系统错误")
-	}
-
-	err := u.cmd.Set(ctx, fmt.Sprintf("users:ssid:%s", claims.Ssid), "", time.Hour*24*7).Err()
+	err := u.ClearToken(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
