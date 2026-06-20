@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/JaylanCharles/byline/internal/domain"
+	"github.com/JaylanCharles/byline/pkg/logger"
 )
 
 type Service interface {
@@ -23,13 +24,15 @@ type service struct {
 	appID     string
 	appSecret string
 	client    *http.Client
+	l         logger.Logger
 }
 
-func NewService(appID string, appSecret string) Service {
+func NewService(appID string, appSecret string, l logger.Logger) Service {
 	return &service{
 		appID:     appID,
 		appSecret: appSecret,
 		client:    http.DefaultClient,
+		l:         l,
 	}
 }
 

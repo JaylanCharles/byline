@@ -6,7 +6,7 @@ import (
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository"
-	"go.uber.org/zap"
+	"github.com/JaylanCharles/byline/pkg/logger"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,10 +24,10 @@ type UserService interface {
 
 type userService struct {
 	repo repository.UserRepository
-	l    *zap.Logger
+	l    logger.Logger
 }
 
-func NewUserService(repo repository.UserRepository, l *zap.Logger) UserService {
+func NewUserService(repo repository.UserRepository, l logger.Logger) UserService {
 	return &userService{
 		repo: repo,
 		l:    l,
