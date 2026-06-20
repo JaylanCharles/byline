@@ -1,12 +1,15 @@
 package ioc
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
+	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/logger"
+	logger2 "github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -22,9 +25,15 @@ func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl
 }
 
 // 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
-func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler) []gin.HandlerFunc {
+func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l logger2.Logger) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		corsHdl(),
+		logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
+			l.Debug("HTTP 请求", logger2.Field{
+				Key:   "al",
+				Value: al,
+			})
+		}).Build(),
 		middleware.NewLoginJWTMiddlewareBuilder(jwtHdl).
 			IgorePaths("/users/signup").
 			IgorePaths("/users/login_sms/code/send").
