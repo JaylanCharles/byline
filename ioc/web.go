@@ -10,9 +10,11 @@ import (
 	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/logger"
 	logger2 "github.com/JaylanCharles/byline/pkg/logger"
+	"github.com/fsnotify/fsnotify"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
 )
 
 // 这个方法一定是不稳定的，意思就是以后可能经常改，这是不可避免的
@@ -26,14 +28,19 @@ func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl
 
 // 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
 func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l logger2.Logger) []gin.HandlerFunc {
+	bd := logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
+		l.Debug("HTTP 请求", logger2.Field{
+			Key:   "al",
+			Value: al,
+		})
+	}).AllowReqBody(true).AllowRespBody()
+	viper.OnConfigChange(func(in fsnotify.Event) {
+		ok := viper.GetBool("web.logreq")
+		bd.AllowReqBody(ok)
+	})
 	return []gin.HandlerFunc{
 		corsHdl(),
-		logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
-			l.Debug("HTTP 请求", logger2.Field{
-				Key:   "al",
-				Value: al,
-			})
-		}).Build(),
+		bd.Build(),
 		middleware.NewLoginJWTMiddlewareBuilder(jwtHdl).
 			IgorePaths("/users/signup").
 			IgorePaths("/users/login_sms/code/send").
