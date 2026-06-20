@@ -4,9 +4,10 @@ import (
 	"os"
 
 	"github.com/JaylanCharles/byline/internal/service/oauth2/wechat"
+	"github.com/JaylanCharles/byline/pkg/logger"
 )
 
-func InitOAuth2WechatService() wechat.Service {
+func InitOAuth2WechatService(l logger.Logger) wechat.Service {
 	appId, ok := os.LookupEnv("WECHAT_APP_ID")
 	if !ok {
 		panic("没有找到环境变量 WECHAT_APP_ID")
@@ -15,5 +16,5 @@ func InitOAuth2WechatService() wechat.Service {
 	if !ok {
 		panic("没有找到环境变量 WECHAT_APP_SECRET")
 	}
-	return wechat.NewService(appId, appKey)
+	return wechat.NewService(appId, appKey, l)
 }
