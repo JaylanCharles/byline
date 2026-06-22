@@ -88,6 +88,47 @@ func (s *ArticleHandlerSuite) TestEdit() {
 				Msg:  "OK",
 			},
 		},
+		{
+			name: "修改已有帖子，并保存",
+			before: func(t *testing.T) {
+				err := s.db.Create(dao.Article{
+					// 为了测试方便，这个给一个指定的 Id，方便验证数据的时候使用这个 Id 进行查询
+					Id:       2,
+					Title:    "我的标题",
+					Content:  "我的内容",
+					AuthorId: 123,
+					Ctime:    123,
+					Utime:    234,
+				}).Error
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				var art dao.Article
+				err := s.db.Where("id = ?", 2).First(&art).Error
+				assert.NoError(t, err)
+				assert.True(t, art.Utime > 234)
+				art.Utime = 0
+				assert.Equal(t, dao.Article{
+					Id:      2,
+					Title:   "新的标题",
+					Content: "新的内容",
+					// 和上面保持一致
+					AuthorId: 123,
+					Ctime:    123,
+				}, art)
+			},
+			art: Article{
+				Id:      2,
+				Title:   "新的标题",
+				Content: "新的内容",
+			},
+			wantCode: http.StatusOK,
+			wantRes: Result[int64]{
+				// 我希望你的 ID 是 1
+				Data: 2,
+				Msg:  "OK",
+			},
+		},
 	}
 
 	for _, tc := range testCases {

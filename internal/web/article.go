@@ -30,6 +30,7 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
 	type Req struct {
+		Id      int64  `json:"id"`
 		Title   string `json:"title"`
 		Content string `json:"content"`
 	}
@@ -54,6 +55,7 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 
 	//调用svc
 	id, err := h.svc.Save(ctx, domain.Article{
+		Id:      req.Id,
 		Title:   req.Title,
 		Content: req.Content,
 		Author: domain.Author{
