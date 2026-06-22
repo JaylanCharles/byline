@@ -129,6 +129,48 @@ func (s *ArticleHandlerSuite) TestEdit() {
 				Msg:  "OK",
 			},
 		},
+		{
+			name: "修改帖子-别人的帖子",
+			// 现在 uid 是 123 的是攻击者
+			before: func(t *testing.T) {
+				// 假装数据库已经有这个帖子
+				err := s.db.Create(&dao.Article{
+					Id:      3,
+					Title:   "我的标题",
+					Content: "我的内容",
+					// 模拟别人
+					AuthorId: 789,
+					Ctime:    123,
+					Utime:    234,
+				}).Error
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				// 你要验证，保存到了数据库里面
+				var art dao.Article
+				err := s.db.Where("id=?", 3).
+					First(&art).Error
+				assert.NoError(t, err)
+				assert.Equal(t, dao.Article{
+					Id:       3,
+					Title:    "我的标题",
+					Content:  "我的内容",
+					AuthorId: 789,
+					Ctime:    123,
+					Utime:    234,
+				}, art)
+			},
+			art: Article{
+				Id:      3,
+				Title:   "新的标题",
+				Content: "新的内容",
+			},
+			wantCode: http.StatusOK,
+			wantRes: Result[int64]{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
