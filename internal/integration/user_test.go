@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JaylanCharles/byline/internal/integration/startup"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/ioc"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestUserHandler_e2e_SendLoginSMSCode(t *testing.T) {
-	server := InitWebServer()
+	server := startup.InitWebServerALL()
 	rdb := ioc.InitRedis()
 	testCases := []struct {
 		name string

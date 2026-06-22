@@ -12,7 +12,7 @@ import (
 
 func main() {
 	initLogger()
-	initViper()
+	initViperRemote()
 	server := InitWebServer()
 	server.Run(":8080")
 }

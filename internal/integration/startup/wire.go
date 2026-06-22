@@ -14,6 +14,43 @@ import (
 	"github.com/google/wire"
 )
 
+// func 名字随便
+func InitWebServerALL() *gin.Engine {
+	wire.Build(
+		thirdPartySet,
+		userSvcProvider,
+		articlSvcProvider,
+
+		cache.NewCodeCache,
+
+		repository.NewCodeRepository,
+
+		service.NewCodeService,
+		ioc.InitSMSService,
+		InitOAuth2WechatService,
+
+		web.NewUserHandler,
+		web.NewOAuth2WechatHandler,
+		web.NewArticleHandler,
+		ijwt.NewRedisJWTHandler,
+
+		ioc.InitMiddlewares,
+		ioc.InitWebServer,
+	)
+	return new(gin.Engine) // 没有什么作用，就是单纯让语法不出错
+}
+
+func InitArticleHandler() *web.ArticleHandler {
+	wire.Build(
+		thirdPartySet,
+		dao.NewGORMArticleDAO,
+		repository.NewCachedArticleRepository,
+		service.NewArticleService,
+		web.NewArticleHandler,
+	)
+	return &web.ArticleHandler{}
+}
+
 var thirdPartySet = wire.NewSet( // 第三方依赖
 	InitRedis, InitDB,
 	InitLogger)
@@ -21,49 +58,10 @@ var thirdPartySet = wire.NewSet( // 第三方依赖
 var userSvcProvider = wire.NewSet(
 	dao.NewUserDAO,
 	cache.NewUserCache,
-	repository.NewCachedUserRepository,
+	repository.NewUserRepository,
 	service.NewUserService)
 
 var articlSvcProvider = wire.NewSet(
 	repository.NewCachedArticleRepository,
-	cache.NewArticleRedisCache,
-	dao.NewArticleGORMDAO,
+	dao.NewGORMArticleDAO,
 	service.NewArticleService)
-
-func InitWebServer() *gin.Engine {
-	wire.Build(
-		thirdPartySet,
-		userSvcProvider,
-		articlSvcProvider,
-		// cache 部分
-		cache.NewCodeCache,
-
-		// repository 部分
-		repository.NewCodeRepository,
-
-		// Service 部分
-		ioc.InitSMSService,
-		service.NewCodeService,
-		InitWechatService,
-
-		// handler 部分
-		web.NewUserHandler,
-		web.NewArticleHandler,
-		web.NewOAuth2WechatHandler,
-		ijwt.NewRedisJWTHandler,
-		ioc.InitGinMiddlewares,
-		ioc.InitWebServer,
-	)
-	return gin.Default()
-}
-
-func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
-	wire.Build(
-		thirdPartySet,
-		userSvcProvider,
-		repository.NewCachedArticleRepository,
-		cache.NewArticleRedisCache,
-		service.NewArticleService,
-		web.NewArticleHandler)
-	return &web.ArticleHandler{}
-}

@@ -5,6 +5,6 @@ import (
 	"github.com/JaylanCharles/byline/pkg/logger"
 )
 
-func InitWechatService(l logger.Logger) wechat.Service {
+func InitOAuth2WechatService(l logger.Logger) wechat.Service {
 	return wechat.NewService("", "", l)
 }

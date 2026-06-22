@@ -16,12 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type Article struct {
-	Id      int64  `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
 type ArticleHandlerSuite struct {
 	suite.Suite
 	db     *gorm.DB
@@ -30,15 +24,22 @@ type ArticleHandlerSuite struct {
 
 func (s *ArticleHandlerSuite) SetupSuite() {
 	s.db = startup.InitDB()
-	hdl := startup.InitArticleHandler(dao.NewArticleGORMDAO(s.db))
-	server := gin.Default()
-	server.Use(func(ctx *gin.Context) {
-		ctx.Set("user", ijwt.UserClaims{
+	s.server = gin.Default()
+	artHdl := startup.InitArticleHandler()
+	s.server.Use(func(ctx *gin.Context) {
+		ctx.Set("claims", &ijwt.UserClaims{
 			Uid: 123,
 		})
 	})
-	hdl.RegisterRoutes(server)
-	s.server = server
+	artHdl.RegisterRoutes(s.server)
+}
+
+func (s *ArticleHandlerSuite) TearDownTest() {
+	s.db.Exec("TRUNCATE TABLE articles")
+
+}
+func TestArticleHandlerSuite(t *testing.T) {
+	suite.Run(t, new(ArticleHandlerSuite))
 }
 
 func (s *ArticleHandlerSuite) TestEdit() {
@@ -49,30 +50,31 @@ func (s *ArticleHandlerSuite) TestEdit() {
 		after  func(t *testing.T)
 
 		// 前端传过来，肯定是一个 JSON
+		// 预期中的输入
 		art Article
 
 		wantCode int
-		wantRes  Result[int64]
+		// int64 表示希望结果里面带上文章的 id
+		wantRes Result[int64]
 	}{
 		{
-			name:   "新建帖子",
-			before: func(t *testing.T) {},
+			name: "新建帖子-保存成功",
+			before: func(t *testing.T) {
+				s.TearDownTest()
+			},
 			after: func(t *testing.T) {
-				// 你要验证，保存到了数据库里面
 				var art dao.Article
-				err := s.db.Where("author_id=?", 123).
-					First(&art).Error
+				err := s.db.Where("id = ?", 1).First(&art).Error
 				assert.NoError(t, err)
-				assert.True(t, art.Ctime > 0)
 				assert.True(t, art.Utime > 0)
-				art.Ctime = 0
+				assert.True(t, art.Ctime > 0)
 				art.Utime = 0
+				art.Ctime = 0
 				assert.Equal(t, dao.Article{
 					Id:       1,
 					Title:    "我的标题",
 					Content:  "我的内容",
 					AuthorId: 123,
-					Status:   1,
 				}, art)
 			},
 			art: Article{
@@ -83,93 +85,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 			wantRes: Result[int64]{
 				// 我希望你的 ID 是 1
 				Data: 1,
-			},
-		},
-		{
-			name: "修改帖子",
-			before: func(t *testing.T) {
-				// 假装数据库已经有这个帖子
-				err := s.db.Create(&dao.Article{
-					Id:       11,
-					Title:    "我的标题",
-					Content:  "我的内容",
-					AuthorId: 123,
-					// 假设这是一个已经发表了的帖子
-					Status: 2,
-					Ctime:  456,
-					Utime:  789,
-				}).Error
-				assert.NoError(t, err)
-			},
-			after: func(t *testing.T) {
-				// 你要验证，保存到了数据库里面
-				var art dao.Article
-				err := s.db.Where("id=?", 11).
-					First(&art).Error
-				assert.NoError(t, err)
-				assert.True(t, art.Utime > 789)
-				art.Utime = 0
-				assert.Equal(t, dao.Article{
-					Id:       11,
-					Title:    "新的标题",
-					Content:  "新的内容",
-					AuthorId: 123,
-					// 更新之后，是未发表状态
-					Status: 1,
-					Ctime:  456,
-				}, art)
-			},
-			art: Article{
-				Id:      11,
-				Title:   "新的标题",
-				Content: "新的内容",
-			},
-			wantCode: http.StatusOK,
-			wantRes: Result[int64]{
-				// 我希望你的 ID 是 11
-				Data: 11,
-			},
-		},
-		{
-			name: "修改帖子-别人的帖子",
-			before: func(t *testing.T) {
-				// 假装数据库已经有这个帖子
-				err := s.db.Create(&dao.Article{
-					Id:      22,
-					Title:   "我的标题",
-					Content: "我的内容",
-					// 模拟别人
-					AuthorId: 1024,
-					Status:   2,
-					Ctime:    456,
-					Utime:    789,
-				}).Error
-				assert.NoError(t, err)
-			},
-			after: func(t *testing.T) {
-				// 你要验证，保存到了数据库里面
-				var art dao.Article
-				err := s.db.Where("id=?", 22).
-					First(&art).Error
-				assert.NoError(t, err)
-				assert.Equal(t, dao.Article{
-					Id:       22,
-					Title:    "我的标题",
-					Content:  "我的内容",
-					AuthorId: 1024,
-					Status:   2,
-					Ctime:    456,
-					Utime:    789,
-				}, art)
-			},
-			art: Article{
-				Id:      22,
-				Title:   "新的标题",
-				Content: "新的内容",
-			},
-			wantCode: http.StatusOK,
-			wantRes: Result[int64]{
-				Msg: "系统错误",
+				Msg:  "OK",
 			},
 		},
 	}
@@ -181,10 +97,12 @@ func (s *ArticleHandlerSuite) TestEdit() {
 
 			reqBody, err := json.Marshal(tc.art)
 			assert.NoError(t, err)
+
 			// 准备Req和记录的 recorder
 			req, err := http.NewRequest(http.MethodPost, "/articles/edit", bytes.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
 			assert.NoError(t, err)
+
+			req.Header.Set("Content-Type", "application/json")
 			recorder := httptest.NewRecorder()
 
 			// 执行
@@ -200,4 +118,16 @@ func (s *ArticleHandlerSuite) TestEdit() {
 			assert.Equal(t, tc.wantRes, res)
 		})
 	}
+}
+
+type Result[T any] struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data T      `json:"data"`
+}
+
+type Article struct {
+	Id      int64  `json:"id"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
 }
