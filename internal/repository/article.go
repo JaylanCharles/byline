@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
@@ -10,6 +11,7 @@ import (
 type ArticleRepository interface {
 	Create(ctx context.Context, art domain.Article) (int64, error)
 	Update(ctx context.Context, art domain.Article) error
+	Sync(ctx context.Context, art domain.Article) (int64, error)
 }
 
 type CachedArticleRepository struct {
@@ -22,6 +24,10 @@ func NewCachedArticleRepository(dao dao.ArticleDAO) ArticleRepository {
 	}
 }
 
+func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
+	return c.dao.Sync(ctx, c.toEntity(art))
+}
+
 func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
 	return c.dao.Insert(ctx, dao.Article{
 		Title:    art.Title,
@@ -31,10 +37,33 @@ func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article
 }
 
 func (c *CachedArticleRepository) Update(ctx context.Context, art domain.Article) error {
-	return c.dao.Update(ctx, dao.Article{
+	return c.dao.UpdateById(ctx, dao.Article{
 		Id:       art.Id,
 		Title:    art.Title,
 		Content:  art.Content,
 		AuthorId: art.Author.Id,
 	})
+}
+
+func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
+	return dao.Article{
+		Id:       art.Id,
+		Title:    art.Title,
+		Content:  art.Content,
+		AuthorId: art.Author.Id,
+	}
+}
+
+func (c *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
+	return domain.Article{
+		Id:      art.Id,
+		Title:   art.Title,
+		Content: art.Content,
+		Author: domain.Author{
+			// 这里有一个错误
+			Id: art.AuthorId,
+		},
+		Ctime: time.UnixMilli(art.Ctime),
+		Utime: time.UnixMilli(art.Utime),
+	}
 }
