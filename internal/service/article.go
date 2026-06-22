@@ -9,6 +9,7 @@ import (
 
 type ArticleService interface {
 	Save(ctx context.Context, art domain.Article) (int64, error)
+	Publish(ctx context.Context, art domain.Article) (int64, error)
 }
 
 type articleService struct {
@@ -27,4 +28,9 @@ func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, e
 		return art.Id, err
 	}
 	return a.repo.Create(ctx, art)
+}
+
+func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
+	//TODO implement me
+	panic("implement me")
 }
