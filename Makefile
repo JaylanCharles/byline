@@ -5,6 +5,10 @@ docker:
 	docker rmi -f jaylancharles/byline:v0.0.4 || true
 	docker build -t jaylancharles/byline:v0.0.5 .
 
+.PHONY: cnt
+cnt:
+	cloc . --vcs=git --not-match-f="\.mock\.go$$"
+
 .PHONY: mock
 mock:
 	@mockgen -source=internal/service/user.go -destination=internal/service/mocks/user.mock.go -package=svcmocks

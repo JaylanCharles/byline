@@ -34,6 +34,7 @@ func (dao *GORMArticleDAO) Upsert(ctx context.Context, art PublishedArticle) err
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"title":   art.Title,
 			"content": art.Content,
+			"status":  art.Status,
 			"utime":   now,
 		}),
 	}).Create(&art).Error
@@ -55,6 +56,7 @@ func (dao *GORMArticleDAO) UpdateById(ctx context.Context, art Article) error {
 		Updates(map[string]any{
 			"title":   art.Title,
 			"content": art.Content,
+			"status":  art.Status,
 			"utime":   art.Utime,
 		})
 	if res.Error != nil {
@@ -92,6 +94,7 @@ type Article struct {
 	Title    string `gorm:"type=varchar(1024)"`
 	Content  string `gorm:"type=BLOB"`
 	AuthorId int64  `gorm:"index"`
+	Status   uint8
 	Ctime    int64
 	Utime    int64
 }

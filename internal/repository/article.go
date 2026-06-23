@@ -25,32 +25,24 @@ func NewCachedArticleRepository(dao dao.ArticleDAO) ArticleRepository {
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
-	return c.dao.Sync(ctx, c.toEntity(art))
+	return c.dao.Sync(ctx, c.toDAO(art))
 }
 
 func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
-	return c.dao.Insert(ctx, dao.Article{
-		Title:    art.Title,
-		Content:  art.Content,
-		AuthorId: art.Author.Id,
-	})
+	return c.dao.Insert(ctx, c.toDAO(art))
 }
 
 func (c *CachedArticleRepository) Update(ctx context.Context, art domain.Article) error {
-	return c.dao.UpdateById(ctx, dao.Article{
-		Id:       art.Id,
-		Title:    art.Title,
-		Content:  art.Content,
-		AuthorId: art.Author.Id,
-	})
+	return c.dao.UpdateById(ctx, c.toDAO(art))
 }
 
-func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
+func (c *CachedArticleRepository) toDAO(art domain.Article) dao.Article {
 	return dao.Article{
 		Id:       art.Id,
 		Title:    art.Title,
 		Content:  art.Content,
 		AuthorId: art.Author.Id,
+		Status:   art.Status.ToUint8(),
 	}
 }
 

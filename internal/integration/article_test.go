@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/integration/startup"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
@@ -75,6 +76,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Title:    "我的标题",
 					Content:  "我的内容",
 					AuthorId: 123,
+					Status:   domain.ArticleStatusUnpublish.ToUint8(),
 				}, art)
 			},
 			art: Article{
@@ -99,6 +101,8 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					AuthorId: 123,
 					Ctime:    123,
 					Utime:    234,
+					// 假设已经发表的帖子进行修改
+					Status: domain.ArticleStatusPublish.ToUint8(),
 				}).Error
 				assert.NoError(t, err)
 			},
@@ -115,6 +119,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					// 和上面保持一致
 					AuthorId: 123,
 					Ctime:    123,
+					Status:   domain.ArticleStatusUnpublish.ToUint8(),
 				}, art)
 			},
 			art: Article{
@@ -140,8 +145,10 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Content: "我的内容",
 					// 模拟别人
 					AuthorId: 789,
-					Ctime:    123,
-					Utime:    234,
+					// 假设已经发表的帖子进行修改
+					Status: domain.ArticleStatusPublish.ToUint8(),
+					Ctime:  123,
+					Utime:  234,
 				}).Error
 				assert.NoError(t, err)
 			},
@@ -156,6 +163,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Title:    "我的标题",
 					Content:  "我的内容",
 					AuthorId: 789,
+					Status:   domain.ArticleStatusPublish.ToUint8(),
 					Ctime:    123,
 					Utime:    234,
 				}, art)
