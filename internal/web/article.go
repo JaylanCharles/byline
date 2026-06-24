@@ -27,6 +27,7 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/articles") // 就是习惯使用复数了，也算不上好的实践
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
+	g.POST("/withdraw", h.Withdraw)
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -49,14 +50,7 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 	}
 
 	//调用svc
-	id, err := h.svc.Save(ctx, domain.Article{
-		Id:      req.Id,
-		Title:   req.Title,
-		Content: req.Content,
-		Author: domain.Author{
-			Id: claims.Uid,
-		},
-	})
+	id, err := h.svc.Save(ctx, req.toDomain(claims.Uid))
 
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -109,6 +103,52 @@ func (h *ArticleHandler) Publish(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{
 		Msg:  "OK",
 		Data: id,
+	})
+}
+
+func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
+	type Req struct {
+		Id int64
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// 参数校验，这里不写了
+
+	c := ctx.MustGet("claims")
+	claims, ok := c.(*ijwt.UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("未发现用户的 session 信息")
+		return
+	}
+
+	//调用svc
+	err := h.svc.Withdraw(ctx, domain.Article{
+		Id: req.Id,
+		Author: domain.Author{
+			Id: claims.Uid,
+		},
+	})
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		// 这里应该打日志
+		h.l.Error("隐藏帖子失败", logger.Error(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Result{
+		Msg:  "OK",
+		Data: req.Id,
 	})
 }
 

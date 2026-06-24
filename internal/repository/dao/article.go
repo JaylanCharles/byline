@@ -14,6 +14,7 @@ type ArticleDAO interface {
 	UpdateById(ctx context.Context, art Article) error
 	Sync(ctx context.Context, art Article) (int64, error)
 	Upsert(ctx context.Context, art PublishedArticle) error
+	SyncStatus(ctx context.Context, id int64, author int64, status uint8) error
 }
 
 type GORMArticleDAO struct {
@@ -24,6 +25,35 @@ func NewGORMArticleDAO(db *gorm.DB) ArticleDAO {
 	return &GORMArticleDAO{
 		db: db,
 	}
+}
+
+func (dao *GORMArticleDAO) SyncStatus(ctx context.Context, id int64, author int64, status uint8) error {
+	now := time.Now().UnixMilli()
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Article{}).Where("id = ? AND author_id = ?", id, author).
+			Updates(map[string]any{
+				"status": status,
+				"Utime":  now,
+			})
+
+		if res.Error != nil {
+			// 数据库有问题
+			return res.Error
+		}
+
+		if res.RowsAffected != 1 {
+			// 要么 ID 是错的，要么是作者不对
+			// 后者情况下，可能有人在搞你的系统
+			return fmt.Errorf("可能有人在搞你，误操作非自己的文章，uid: %d, aid: %d", author, id)
+		}
+
+		return tx.Model(&Article{}).Where("id = ?", id).
+			Updates(map[string]any{
+				"status": status,
+				"Utime":  now,
+			}).Error
+	})
+
 }
 
 func (dao *GORMArticleDAO) Upsert(ctx context.Context, art PublishedArticle) error {

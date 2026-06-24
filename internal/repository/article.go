@@ -12,6 +12,7 @@ type ArticleRepository interface {
 	Create(ctx context.Context, art domain.Article) (int64, error)
 	Update(ctx context.Context, art domain.Article) error
 	Sync(ctx context.Context, art domain.Article) (int64, error)
+	SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error
 }
 
 type CachedArticleRepository struct {
@@ -22,6 +23,10 @@ func NewCachedArticleRepository(dao dao.ArticleDAO) ArticleRepository {
 	return &CachedArticleRepository{
 		dao: dao,
 	}
+}
+
+func (c *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error {
+	return c.dao.SyncStatus(ctx, id, author, status.ToUint8())
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
