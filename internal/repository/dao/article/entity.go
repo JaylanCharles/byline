@@ -14,5 +14,5 @@ type Article struct {
 }
 
 type PublishedArticle struct {
-	Article
+	Article `bson:",inline"`
 }

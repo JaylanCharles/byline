@@ -41,10 +41,9 @@ func InitWebServerALL() *gin.Engine {
 	return new(gin.Engine) // 没有什么作用，就是单纯让语法不出错
 }
 
-func InitArticleHandler() *web.ArticleHandler {
+func InitArticleHandler(dao article.ArticleDAO) *web.ArticleHandler {
 	wire.Build(
 		thirdPartySet,
-		article.NewGORMArticleDAO,
 		repository.NewCachedArticleRepository,
 		service.NewArticleService,
 		web.NewArticleHandler,

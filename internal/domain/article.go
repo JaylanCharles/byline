@@ -6,9 +6,9 @@ const (
 	// 未知状态
 	ArticleStatusUnknow ArticleStatus = iota
 	// 未发表
-	ArticleStatusUnpublish
+	ArticleStatusUnpublished
 	// 已发表
-	ArticleStatusPublish
+	ArticleStatusPublished
 	// 仅自己可见
 	ArticleStatusPrivate
 )

@@ -28,7 +28,7 @@ func (a *articleService) Withdraw(ctx context.Context, art domain.Article) error
 }
 
 func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
-	art.Status = domain.ArticleStatusUnpublish
+	art.Status = domain.ArticleStatusUnpublished
 	if art.Id > 0 {
 		err := a.repo.Update(ctx, art)
 		return art.Id, err
@@ -37,6 +37,6 @@ func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, e
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
-	art.Status = domain.ArticleStatusPublish
+	art.Status = domain.ArticleStatusPublished
 	return a.repo.Sync(ctx, art)
 }

@@ -26,7 +26,7 @@ type ArticleHandlerSuite struct {
 func (s *ArticleHandlerSuite) SetupSuite() {
 	s.db = startup.InitDB()
 	s.server = gin.Default()
-	artHdl := startup.InitArticleHandler()
+	artHdl := startup.InitArticleHandler(article.NewGORMArticleDAO(s.db))
 	s.server.Use(func(ctx *gin.Context) {
 		ctx.Set("claims", &ijwt.UserClaims{
 			Uid: 123,
@@ -76,7 +76,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Title:    "我的标题",
 					Content:  "我的内容",
 					AuthorId: 123,
-					Status:   domain.ArticleStatusUnpublish.ToUint8(),
+					Status:   domain.ArticleStatusUnpublished.ToUint8(),
 				}, art)
 			},
 			art: Article{
@@ -102,7 +102,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Ctime:    123,
 					Utime:    234,
 					// 假设已经发表的帖子进行修改
-					Status: domain.ArticleStatusPublish.ToUint8(),
+					Status: domain.ArticleStatusPublished.ToUint8(),
 				}).Error
 				assert.NoError(t, err)
 			},
@@ -119,7 +119,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					// 和上面保持一致
 					AuthorId: 123,
 					Ctime:    123,
-					Status:   domain.ArticleStatusUnpublish.ToUint8(),
+					Status:   domain.ArticleStatusUnpublished.ToUint8(),
 				}, art)
 			},
 			art: Article{
@@ -146,7 +146,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					// 模拟别人
 					AuthorId: 789,
 					// 假设已经发表的帖子进行修改
-					Status: domain.ArticleStatusPublish.ToUint8(),
+					Status: domain.ArticleStatusPublished.ToUint8(),
 					Ctime:  123,
 					Utime:  234,
 				}).Error
@@ -163,7 +163,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 					Title:    "我的标题",
 					Content:  "我的内容",
 					AuthorId: 789,
-					Status:   domain.ArticleStatusPublish.ToUint8(),
+					Status:   domain.ArticleStatusPublished.ToUint8(),
 					Ctime:    123,
 					Utime:    234,
 				}, art)

@@ -30,7 +30,7 @@ func (c *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, auth
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
-	return c.dao.SyncClosure(ctx, c.toEntity(art))
+	return c.dao.Sync(ctx, c.toEntity(art))
 }
 
 func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
