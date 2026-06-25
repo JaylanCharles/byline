@@ -10,6 +10,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/internal/repository/dao/article"
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/jwt"
@@ -38,7 +39,7 @@ func InitWebServerALL() *gin.Engine {
 	userHandler := web.NewUserHandler(userService, codeService, handler)
 	wechatService := InitOAuth2WechatService(logger)
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(wechatService, userService, handler)
-	articleDAO := dao.NewGORMArticleDAO(db)
+	articleDAO := article.NewGORMArticleDAO(db)
 	articleRepository := repository.NewCachedArticleRepository(articleDAO)
 	articleService := service.NewArticleService(articleRepository)
 	articleHandler := web.NewArticleHandler(articleService, logger)
@@ -48,7 +49,7 @@ func InitWebServerALL() *gin.Engine {
 
 func InitArticleHandler() *web.ArticleHandler {
 	db := InitDB()
-	articleDAO := dao.NewGORMArticleDAO(db)
+	articleDAO := article.NewGORMArticleDAO(db)
 	articleRepository := repository.NewCachedArticleRepository(articleDAO)
 	articleService := service.NewArticleService(articleRepository)
 	logger := InitLogger()
@@ -64,4 +65,4 @@ var thirdPartySet = wire.NewSet(
 
 var userSvcProvider = wire.NewSet(dao.NewUserDAO, cache.NewUserCache, repository.NewUserRepository, service.NewUserService)
 
-var articlSvcProvider = wire.NewSet(repository.NewCachedArticleRepository, dao.NewGORMArticleDAO, service.NewArticleService)
+var articlSvcProvider = wire.NewSet(repository.NewCachedArticleRepository, article.NewGORMArticleDAO, service.NewArticleService)

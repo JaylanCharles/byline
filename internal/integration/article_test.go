@@ -9,7 +9,7 @@ import (
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/integration/startup"
-	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/internal/repository/dao/article"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -64,14 +64,14 @@ func (s *ArticleHandlerSuite) TestEdit() {
 				s.TearDownTest()
 			},
 			after: func(t *testing.T) {
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id = ?", 1).First(&art).Error
 				assert.NoError(t, err)
 				assert.True(t, art.Utime > 0)
 				assert.True(t, art.Ctime > 0)
 				art.Utime = 0
 				art.Ctime = 0
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:       1,
 					Title:    "我的标题",
 					Content:  "我的内容",
@@ -93,7 +93,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 		{
 			name: "修改已有帖子，并保存",
 			before: func(t *testing.T) {
-				err := s.db.Create(dao.Article{
+				err := s.db.Create(article.Article{
 					// 为了测试方便，这个给一个指定的 Id，方便验证数据的时候使用这个 Id 进行查询
 					Id:       2,
 					Title:    "我的标题",
@@ -107,12 +107,12 @@ func (s *ArticleHandlerSuite) TestEdit() {
 				assert.NoError(t, err)
 			},
 			after: func(t *testing.T) {
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id = ?", 2).First(&art).Error
 				assert.NoError(t, err)
 				assert.True(t, art.Utime > 234)
 				art.Utime = 0
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:      2,
 					Title:   "新的标题",
 					Content: "新的内容",
@@ -139,7 +139,7 @@ func (s *ArticleHandlerSuite) TestEdit() {
 			// 现在 uid 是 123 的是攻击者
 			before: func(t *testing.T) {
 				// 假装数据库已经有这个帖子
-				err := s.db.Create(&dao.Article{
+				err := s.db.Create(&article.Article{
 					Id:      3,
 					Title:   "我的标题",
 					Content: "我的内容",
@@ -154,11 +154,11 @@ func (s *ArticleHandlerSuite) TestEdit() {
 			},
 			after: func(t *testing.T) {
 				// 你要验证，保存到了数据库里面
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id=?", 3).
 					First(&art).Error
 				assert.NoError(t, err)
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:       3,
 					Title:    "我的标题",
 					Content:  "我的内容",

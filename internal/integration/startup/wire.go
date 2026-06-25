@@ -6,6 +6,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/internal/repository/dao/article"
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
@@ -43,7 +44,7 @@ func InitWebServerALL() *gin.Engine {
 func InitArticleHandler() *web.ArticleHandler {
 	wire.Build(
 		thirdPartySet,
-		dao.NewGORMArticleDAO,
+		article.NewGORMArticleDAO,
 		repository.NewCachedArticleRepository,
 		service.NewArticleService,
 		web.NewArticleHandler,
@@ -63,5 +64,5 @@ var userSvcProvider = wire.NewSet(
 
 var articlSvcProvider = wire.NewSet(
 	repository.NewCachedArticleRepository,
-	dao.NewGORMArticleDAO,
+	article.NewGORMArticleDAO,
 	service.NewArticleService)
