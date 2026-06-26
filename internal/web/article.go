@@ -2,11 +2,14 @@ package web
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
+	"github.com/JaylanCharles/byline/pkg/ginx"
 	"github.com/JaylanCharles/byline/pkg/logger"
+	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,6 +31,7 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
 	g.POST("/withdraw", h.Withdraw)
+	g.POST("/list", ginx.WrapBodyAndToken[ListReq, ijwt.UserClaims](h.List))
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -152,19 +156,32 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 	})
 }
 
-type ArticleReq struct {
-	Id      int64  `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
-func (req *ArticleReq) toDomain(uid int64) domain.Article {
-	return domain.Article{
-		Id:      req.Id,
-		Title:   req.Title,
-		Content: req.Content,
-		Author: domain.Author{
-			Id: uid,
-		},
+func (h *ArticleHandler) List(ctx *gin.Context, req ListReq, uc ijwt.UserClaims) (ginx.Result, error) {
+	res, err := h.svc.List(ctx, uc.Uid, req.Offset, req.Limit)
+	if err != nil {
+		return ginx.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, nil
 	}
+	// 在列表页，不显示全文，只显示一个"摘要"
+	// 比如说，简单的摘要就是前几句话
+	// 强大的摘要是 AI 帮你生成的
+	return ginx.Result{
+		Data: slice.Map[domain.Article, ArticleVO](res,
+			func(idx int, src domain.Article) ArticleVO {
+				return ArticleVO{
+					Id:       src.Id,
+					Title:    src.Title,
+					Abstract: src.Abstract(),
+					Status:   src.Status.ToUint8(),
+					// 这个列表请求，不需要返回内容
+					//Content: src.Content,
+					// 这个是创作者看自己的文章列表，也不需要这个字段
+					//Author: src.Author
+					Ctime: src.Ctime.Format(time.DateTime),
+					Utime: src.Utime.Format(time.DateTime),
+				}
+			}),
+	}, nil
 }

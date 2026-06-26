@@ -1,9 +1,8 @@
-package middlewares
+package ginx
 
 import (
 	"net/http"
 
-	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -11,7 +10,11 @@ import (
 
 var L logger.Logger
 
-type Result web.Result
+type Result struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data any    `json:"data"`
+}
 
 // 不使用 With()
 func WrapBody[T any](fn func(ctx *gin.Context, req T) (Result, error)) gin.HandlerFunc {
