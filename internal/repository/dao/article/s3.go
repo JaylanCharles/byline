@@ -59,15 +59,9 @@ func (o *S3DAO) Sync(ctx context.Context, art Article) (int64, error) {
 		}
 		art.Id = id
 		publishArt := PublishedArticle{
-			Article{
-				Id:       art.Id,
-				Title:    art.Title,
-				AuthorId: art.AuthorId,
-				Status:   art.Status,
-				Ctime:    now,
-				Utime:    now,
-			},
+			Article: art,
 		}
+		publishArt.Content = ""
 		// 线上库不保存 Content,要准备上传到 OSS 里面
 		return tx.Clauses(clause.OnConflict{
 			// ID 冲突的时候。实际上，在 MYSQL 里面你写不写都可以
@@ -96,5 +90,6 @@ func (o *S3DAO) Sync(ctx context.Context, art Article) (int64, error) {
 }
 
 func (o *S3DAO) SyncStatus(ctx context.Context, author, id int64, status uint8) error {
+	// TODO
 	panic("implement me")
 }
