@@ -53,7 +53,7 @@ func NewRedisInteractiveCache(client redis.Cmdable) InteractiveCache {
 }
 
 func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error {
-	panic("implement me")
+	return r.client.Eval(ctx, luaIncrCnt, []string{r.key(biz, bizId), fieldCollectCnt}, 1).Err()
 }
 
 func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context, biz string, bizId int64) error {
@@ -70,8 +70,7 @@ func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context, biz st
 	// 这边一般是缓存过期了
 	//	return errors.New("缓存中 key 不存在")
 	//}
-	return r.client.Eval(ctx, luaIncrCnt,
-		[]string{r.key(biz, bizId)},
+	return r.client.Eval(ctx, luaIncrCnt, []string{r.key(biz, bizId)},
 		// read_cnt +1
 		fieldReadCnt, 1).Err()
 }
