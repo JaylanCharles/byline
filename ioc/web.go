@@ -9,7 +9,7 @@ import (
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
 	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/logger"
-	logger2 "github.com/JaylanCharles/byline/pkg/logger"
+	loggerMy "github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,18 +18,19 @@ import (
 )
 
 // 这个方法一定是不稳定的，意思就是以后可能经常改，这是不可避免的
-func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl *web.OAuth2WechatHandler) *gin.Engine {
+func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl *web.OAuth2WechatHandler, articleHdl *web.ArticleHandler) *gin.Engine {
 	server := gin.Default()
 	server.Use(mdls...)
 	hdl.RegisterRoutes(server)
 	oauth2WechatHdl.RegisterRoutes(server)
+	articleHdl.RegisterRoutes(server)
 	return server
 }
 
 // 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
-func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l logger2.Logger) []gin.HandlerFunc {
+func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l loggerMy.Logger) []gin.HandlerFunc {
 	bd := logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
-		l.Debug("HTTP 请求", logger2.Field{
+		l.Debug("HTTP 请求", loggerMy.Field{
 			Key:   "al",
 			Value: al,
 		})

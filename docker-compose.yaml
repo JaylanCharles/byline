@@ -27,3 +27,12 @@ services:
       - --listen-client-urls=http://0.0.0.0:2379
     ports:
       - "12379:2379"
+
+  mongo:
+    image: mongo:8.0
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - "27017:27017"
