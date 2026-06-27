@@ -68,6 +68,7 @@ func (r *RedisArticleCache) Set(ctx context.Context, art domain.Article) error {
 	if err != nil {
 		return err
 	}
+	// 你的预测效果越不好，缓存过期时间设置的就需要越短
 	return r.client.Set(ctx, r.authorArtKey(art.Id), data, time.Minute).Err()
 }
 

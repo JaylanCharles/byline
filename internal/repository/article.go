@@ -19,6 +19,7 @@ type ArticleRepository interface {
 	SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error
 
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
+	GetByID(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type CachedArticleRepository struct {
@@ -91,6 +92,24 @@ func (c *CachedArticleRepository) List(ctx context.Context, uid int64, offset in
 	return data, nil
 }
 
+func (c *CachedArticleRepository) preCache(ctx context.Context, data []domain.Article) {
+	//
+	if len(data) > 0 && len(data[0].Content) < 1024*1024 {
+		err := c.cache.Set(ctx, data[0])
+		if err != nil {
+			c.l.Error("提前预加载缓存失败", logger.Error(err))
+		}
+	}
+}
+
+func (c *CachedArticleRepository) GetByID(ctx context.Context, id int64) (domain.Article, error) {
+	data, err := c.dao.GetById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	return c.toDomain(data), nil
+}
+
 func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
 	return dao.Article{
 		Id:       art.Id,
@@ -112,14 +131,5 @@ func (c *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
 		},
 		Ctime: time.UnixMilli(art.Ctime),
 		Utime: time.UnixMilli(art.Utime),
-	}
-}
-
-func (c *CachedArticleRepository) preCache(ctx context.Context, data []domain.Article) {
-	if len(data) > 0 && len(data[0].Content) < 1024*1024 {
-		err := c.cache.Set(ctx, data[0])
-		if err != nil {
-			c.l.Error("提前预加载缓存失败", logger.Error(err))
-		}
 	}
 }

@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
@@ -26,12 +28,14 @@ func NewArticleHandler(svc service.ArticleService, l logger.Logger) *ArticleHand
 		l:   l,
 	}
 }
+
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/articles") // 就是习惯使用复数了，也算不上好的实践
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
 	g.POST("/withdraw", h.Withdraw)
 	g.POST("/list", ginx.WrapBodyAndToken[ListReq, ijwt.UserClaims](h.List))
+	g.GET("/detail/:id", ginx.WrapToken[ijwt.UserClaims](h.Detail))
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -183,5 +187,49 @@ func (h *ArticleHandler) List(ctx *gin.Context, req ListReq, uc ijwt.UserClaims)
 					Utime: src.Utime.Format(time.DateTime),
 				}
 			}),
+	}, nil
+}
+
+func (h *ArticleHandler) Detail(ctx *gin.Context, usr ijwt.UserClaims) (ginx.Result, error) {
+	idstr := ctx.Param("id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		//ctx.JSON(http.StatusOK, )
+		//a.l.Error("前端输入的 ID 不对", logger.Error(err))
+		return ginx.Result{
+			Code: 4,
+			Msg:  "参数错误",
+		}, err
+	}
+	art, err := h.svc.GetById(ctx, id)
+	if err != nil {
+		//ctx.JSON(http.StatusOK, )
+		//a.l.Error("获得文章信息失败", logger.Error(err))
+		return ginx.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
+	}
+	// 这是不借助数据库查询来判定的方法
+	if art.Author.Id != usr.Uid {
+		return ginx.Result{
+			Code: 4,
+			// 也不需要告诉前端究竟发生了什么
+			Msg: "输入有误",
+		}, fmt.Errorf("非法访问文章，创作者 ID 不匹配 %d", usr.Uid)
+	}
+	return ginx.Result{
+		Data: ArticleVO{
+			Id:    art.Id,
+			Title: art.Title,
+			// 不需要这个摘要信息
+			//Abstract: art.Abstract(),
+			Status:  art.Status.ToUint8(),
+			Content: art.Content,
+			// 这个是创作者看自己的文章列表，也不需要这个字段
+			//Author: art.Author
+			Ctime: art.Ctime.Format(time.DateTime),
+			Utime: art.Utime.Format(time.DateTime),
+		},
 	}, nil
 }
