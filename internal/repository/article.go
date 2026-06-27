@@ -55,11 +55,18 @@ func (repo *CachedArticleRepository) Update(ctx context.Context, art domain.Arti
 }
 
 func (repo *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
-	defer func() {
+
+	id, err := repo.dao.Sync(ctx, repo.toEntity(art))
+	if err == nil {
 		// 清空缓存
 		_ = repo.cache.DelFirstPage(ctx, art.Author.Id)
-	}()
-	return repo.dao.Sync(ctx, repo.toEntity(art))
+		err := repo.cache.SetPub(ctx, art)
+		if err != nil {
+			// 不需要特别关心
+			// 比如说输出 WARN 日志
+		}
+	}
+	return id, err
 }
 
 func (repo *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error {
