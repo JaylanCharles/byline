@@ -19,6 +19,12 @@ type ArticleVO struct {
 	Utime  string `json:"utime"`
 }
 
+type LikeReq struct {
+	Id int64 `json:"id"`
+	// 点赞和取消点赞，我都准备复用这个
+	Like bool `json:"like"`
+}
+
 type ListReq struct {
 	Offset int `json:"offset"`
 	Limit  int `json:"limit"`

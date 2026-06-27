@@ -76,11 +76,11 @@ func (dao *GORMInteractiveDAO) InsertLikeInfo(ctx context.Context, biz string, b
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 先准备插入点赞记录
 		// 有没有可能已经点赞过了？
-		// 我要不要校验一下，这里必须是没有点赞过
+		// 我要不要校验一下，这里必须是没有点赞过。不需要！
 		err := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
 				"utime":  now,
-				"statue": 1,
+				"status": 1,
 			}),
 		}).Create(&UserLikeBiz{
 			Biz:    biz,

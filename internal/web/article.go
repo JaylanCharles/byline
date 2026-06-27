@@ -18,14 +18,18 @@ import (
 var _ handler = (*ArticleHandler)(nil)
 
 type ArticleHandler struct {
-	svc service.ArticleService
-	l   logger.Logger
+	svc     service.ArticleService
+	intrSvc service.InteractiveService
+	l       logger.Logger
+	biz     string
 }
 
-func NewArticleHandler(svc service.ArticleService, l logger.Logger) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, intrSvc service.InteractiveService, l logger.Logger) *ArticleHandler {
 	return &ArticleHandler{
-		svc: svc,
-		l:   l,
+		svc:     svc,
+		intrSvc: intrSvc,
+		l:       l,
+		biz:     "article",
 	}
 }
 
@@ -39,6 +43,8 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 
 	pub := g.Group("/pub")
 	pub.GET("/:id", h.PubDetail)
+	// 点赞和取消点赞都是这个接口
+	pub.POST("/like", ginx.WrapBodyAndToken[LikeReq, ijwt.UserClaims](h.Like))
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -257,6 +263,18 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		h.l.Error("获得文章信息失败", logger.Error(err))
 		return
 	}
+
+	// 增加阅读计数。
+	go func() {
+		// 开一个 goroutine，异步去执行
+		er := h.intrSvc.IncrReadCnt(ctx, h.biz, art.Id)
+		if er != nil {
+			h.l.Error("增加阅读计数失败",
+				logger.Int64("aid", art.Id),
+				logger.Error(err))
+		}
+	}()
+
 	ctx.JSON(http.StatusOK, Result{
 		Data: ArticleVO{
 			Id:      art.Id,
@@ -269,4 +287,21 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			Utime:  art.Utime.Format(time.DateTime),
 		},
 	})
+}
+
+func (h *ArticleHandler) Like(ctx *gin.Context, req LikeReq, uc ijwt.UserClaims) (ginx.Result, error) {
+	var err error
+	if req.Like {
+		err = h.intrSvc.Like(ctx, h.biz, req.Id, uc.Uid)
+	} else {
+		err = h.intrSvc.CancelLike(ctx, h.biz, req.Id, uc.Uid)
+	}
+	if err != nil {
+		return ginx.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
+	}
+
+	return ginx.Result{Msg: "OK"}, nil
 }
