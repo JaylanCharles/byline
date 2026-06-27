@@ -15,7 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//var _ handler = (*ArticleHandler)(nil)
+var _ handler = (*ArticleHandler)(nil)
 
 type ArticleHandler struct {
 	svc service.ArticleService
@@ -36,6 +36,9 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/withdraw", h.Withdraw)
 	g.POST("/list", ginx.WrapBodyAndToken[ListReq, ijwt.UserClaims](h.List))
 	g.GET("/detail/:id", ginx.WrapToken[ijwt.UserClaims](h.Detail))
+
+	pub := g.Group("/pub")
+	pub.GET("/:id", h.PubDetail)
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -232,4 +235,38 @@ func (h *ArticleHandler) Detail(ctx *gin.Context, usr ijwt.UserClaims) (ginx.Res
 			Utime: art.Utime.Format(time.DateTime),
 		},
 	}, nil
+}
+
+func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
+	idstr := ctx.Param("id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "参数错误",
+		})
+		h.l.Error("前端输入的 ID 不对", logger.Error(err))
+		return
+	}
+	art, err := h.svc.GetPublishedById(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("获得文章信息失败", logger.Error(err))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Data: ArticleVO{
+			Id:      art.Id,
+			Title:   art.Title,
+			Status:  art.Status.ToUint8(),
+			Content: art.Content,
+			// 要把作者信息带出去
+			Author: art.Author.Name,
+			Ctime:  art.Ctime.Format(time.DateTime),
+			Utime:  art.Utime.Format(time.DateTime),
+		},
+	})
 }

@@ -20,12 +20,15 @@ type ArticleRepository interface {
 
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetByID(ctx context.Context, id int64) (domain.Article, error)
+
+	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type CachedArticleRepository struct {
-	dao   dao.ArticleDAO
-	cache cache.ArticleCache
-	l     logger.Logger
+	dao      dao.ArticleDAO
+	cache    cache.ArticleCache
+	userRepo UserRepository
+	l        logger.Logger
 }
 
 func NewCachedArticleRepository(dao dao.ArticleDAO, l logger.Logger) ArticleRepository {
@@ -35,82 +38,106 @@ func NewCachedArticleRepository(dao dao.ArticleDAO, l logger.Logger) ArticleRepo
 	}
 }
 
-func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
+func (repo *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
 	defer func() {
 		// 清空缓存
-		_ = c.cache.DelFirstPage(ctx, art.Author.Id)
+		_ = repo.cache.DelFirstPage(ctx, art.Author.Id)
 	}()
-	return c.dao.Insert(ctx, c.toEntity(art))
+	return repo.dao.Insert(ctx, repo.toEntity(art))
 }
 
-func (c *CachedArticleRepository) Update(ctx context.Context, art domain.Article) error {
+func (repo *CachedArticleRepository) Update(ctx context.Context, art domain.Article) error {
 	defer func() {
 		// 清空缓存
-		_ = c.cache.DelFirstPage(ctx, art.Author.Id)
+		_ = repo.cache.DelFirstPage(ctx, art.Author.Id)
 	}()
-	return c.dao.UpdateById(ctx, c.toEntity(art))
+	return repo.dao.UpdateById(ctx, repo.toEntity(art))
 }
 
-func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
+func (repo *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
 	defer func() {
 		// 清空缓存
-		_ = c.cache.DelFirstPage(ctx, art.Author.Id)
+		_ = repo.cache.DelFirstPage(ctx, art.Author.Id)
 	}()
-	return c.dao.Sync(ctx, c.toEntity(art))
+	return repo.dao.Sync(ctx, repo.toEntity(art))
 }
 
-func (c *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error {
-	return c.dao.SyncStatus(ctx, id, author, status.ToUint8())
+func (repo *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, author int64, status domain.ArticleStatus) error {
+	return repo.dao.SyncStatus(ctx, id, author, status.ToUint8())
 }
 
-func (c *CachedArticleRepository) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
+func (repo *CachedArticleRepository) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
 	// 你在这个地方，集成你的复杂的缓存方案
 	// 你只缓存这一页
 	if offset == 0 && limit <= 100 {
-		data, err := c.cache.GetFirstPage(ctx, uid)
+		data, err := repo.cache.GetFirstPage(ctx, uid)
 		if err == nil {
 			go func() {
-				c.preCache(ctx, data)
+				repo.preCache(ctx, data)
 			}()
 			//return data[:limit], err
 			return data, err
 		}
 	}
-	res, err := c.dao.GetByAuthor(ctx, uid, offset, limit)
+	res, err := repo.dao.GetByAuthor(ctx, uid, offset, limit)
 	if err != nil {
 		return nil, err
 	}
 	data := slice.Map[dao.Article, domain.Article](res, func(idx int, src dao.Article) domain.Article {
-		return c.toDomain(src)
+		return repo.toDomain(src)
 	})
 	// 回写缓存的时候，可以同步，也可以异步
 	go func() {
-		err := c.cache.SetFirstPage(ctx, uid, data)
-		c.l.Error("回写缓存失败", logger.Error(err))
-		c.preCache(ctx, data)
+		err := repo.cache.SetFirstPage(ctx, uid, data)
+		repo.l.Error("回写缓存失败", logger.Error(err))
+		repo.preCache(ctx, data)
 	}()
 	return data, nil
 }
 
-func (c *CachedArticleRepository) preCache(ctx context.Context, data []domain.Article) {
+func (repo *CachedArticleRepository) preCache(ctx context.Context, data []domain.Article) {
 	//
 	if len(data) > 0 && len(data[0].Content) < 1024*1024 {
-		err := c.cache.Set(ctx, data[0])
+		err := repo.cache.Set(ctx, data[0])
 		if err != nil {
-			c.l.Error("提前预加载缓存失败", logger.Error(err))
+			repo.l.Error("提前预加载缓存失败", logger.Error(err))
 		}
 	}
 }
 
-func (c *CachedArticleRepository) GetByID(ctx context.Context, id int64) (domain.Article, error) {
-	data, err := c.dao.GetById(ctx, id)
+func (repo *CachedArticleRepository) GetByID(ctx context.Context, id int64) (domain.Article, error) {
+	data, err := repo.dao.GetById(ctx, id)
 	if err != nil {
 		return domain.Article{}, err
 	}
-	return c.toDomain(data), nil
+	return repo.toDomain(data), nil
 }
 
-func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
+func (repo *CachedArticleRepository) GetPublishedById(
+	ctx context.Context, id int64) (domain.Article, error) {
+	// 读取线上库数据，如果你的 Content 被你放过去了 OSS 上，你就要让前端去读 Content 字段
+	art, err := repo.dao.GetPubById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	// 你在这边要组装 user 了，适合单体应用
+	usr, err := repo.userRepo.FindById(ctx, art.AuthorId)
+	res := domain.Article{
+		Id:      art.Id,
+		Title:   art.Title,
+		Status:  domain.ArticleStatus(art.Status),
+		Content: art.Content,
+		Author: domain.Author{
+			Id:   usr.Id,
+			Name: usr.Nickname,
+		},
+		Ctime: time.UnixMilli(art.Ctime),
+		Utime: time.UnixMilli(art.Utime),
+	}
+	return res, nil
+}
+
+func (repo *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
 	return dao.Article{
 		Id:       art.Id,
 		Title:    art.Title,
@@ -120,7 +147,7 @@ func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
 	}
 }
 
-func (c *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
+func (repo *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
 	return domain.Article{
 		Id:      art.Id,
 		Title:   art.Title,

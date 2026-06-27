@@ -13,6 +13,7 @@ type ArticleService interface {
 	Withdraw(ctx context.Context, art domain.Article) error
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type articleService struct {
@@ -25,28 +26,33 @@ func NewArticleService(repo repository.ArticleRepository) ArticleService {
 	}
 }
 
-func (a *articleService) Withdraw(ctx context.Context, art domain.Article) error {
-	return a.repo.SyncStatus(ctx, art.Id, art.Author.Id, domain.ArticleStatusPrivate)
+func (svc *articleService) Withdraw(ctx context.Context, art domain.Article) error {
+	return svc.repo.SyncStatus(ctx, art.Id, art.Author.Id, domain.ArticleStatusPrivate)
 }
 
-func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
+func (svc *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
 	art.Status = domain.ArticleStatusUnpublished
 	if art.Id > 0 {
-		err := a.repo.Update(ctx, art)
+		err := svc.repo.Update(ctx, art)
 		return art.Id, err
 	}
-	return a.repo.Create(ctx, art)
+	return svc.repo.Create(ctx, art)
 }
 
-func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
+func (svc *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
 	art.Status = domain.ArticleStatusPublished
-	return a.repo.Sync(ctx, art)
+	return svc.repo.Sync(ctx, art)
 }
 
-func (a *articleService) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
-	return a.repo.List(ctx, uid, offset, limit)
+func (svc *articleService) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
+	return svc.repo.List(ctx, uid, offset, limit)
 }
 
-func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
-	return a.repo.GetByID(ctx, id)
+func (svc *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	return svc.repo.GetByID(ctx, id)
+}
+
+func (svc *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
+	// 另一个选项，在这里组装 Author，调用 UserService
+	return svc.repo.GetPublishedById(ctx, id)
 }
