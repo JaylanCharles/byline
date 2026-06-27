@@ -52,13 +52,11 @@ func NewRedisInteractiveCache(client redis.Cmdable) InteractiveCache {
 	}
 }
 
-func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context,
-	biz string, bizId int64) error {
+func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error {
 	panic("implement me")
 }
 
-func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context,
-	biz string, bizId int64) error {
+func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context, biz string, bizId int64) error {
 	// 拿到的结果，可能自增成功了，可能不需要自增（key不存在）
 	// 你要不要返回一个 error 表达 key 不存在？
 	//res, err := r.client.Eval(ctx, luaIncrCnt,
@@ -78,22 +76,19 @@ func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context,
 		fieldReadCnt, 1).Err()
 }
 
-func (r *RedisInteractiveCache) IncrLikeCntIfPresent(ctx context.Context,
-	biz string, bizId int64) error {
+func (r *RedisInteractiveCache) IncrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error {
 	return r.client.Eval(ctx, luaIncrCnt,
 		[]string{r.key(biz, bizId)},
 		fieldLikeCnt, 1).Err()
 }
 
-func (r *RedisInteractiveCache) DecrLikeCntIfPresent(ctx context.Context,
-	biz string, bizId int64) error {
+func (r *RedisInteractiveCache) DecrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error {
 	return r.client.Eval(ctx, luaIncrCnt,
 		[]string{r.key(biz, bizId)},
 		fieldLikeCnt, -1).Err()
 }
 
-func (r *RedisInteractiveCache) Get(ctx context.Context,
-	biz string, bizId int64) (domain.Interactive, error) {
+func (r *RedisInteractiveCache) Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error) {
 	// 直接使用 HMGet，即便缓存中没有对应的 key，也不会返回 error
 	data, err := r.client.HGetAll(ctx, r.key(biz, bizId)).Result()
 	if err != nil {
