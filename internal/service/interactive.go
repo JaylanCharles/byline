@@ -6,6 +6,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/pkg/logger"
+	"golang.org/x/sync/errgroup"
 )
 
 type InteractiveService interface {
@@ -47,9 +48,41 @@ func (i *interactiveService) CancelLike(ctx context.Context, biz string, bizId i
 
 // Collect 收藏
 func (i *interactiveService) Collect(ctx context.Context, biz string, bizId, cid, uid int64) error {
-	panic("implement me")
+	return i.repo.AddCollectionItem(ctx, biz, bizId, cid, uid)
 }
 
 func (i *interactiveService) Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error) {
-	panic("implement me")
+	var (
+		eg        errgroup.Group
+		intr      domain.Interactive
+		liked     bool
+		collected bool
+	)
+	eg.Go(func() error {
+		var err error
+		intr, err = i.repo.Get(ctx, biz, bizId)
+		return err
+	})
+
+	eg.Go(func() error {
+		var err error
+		liked, err = i.repo.Liked(ctx, biz, bizId, uid)
+		return err
+	})
+
+	eg.Go(func() error {
+		var err error
+		liked, err = i.repo.Collected(ctx, biz, bizId, uid)
+		return err
+	})
+
+	err := eg.Wait()
+	if err != nil {
+		return domain.Interactive{}, err
+	}
+
+	intr.Liked = liked
+	intr.Collected = collected
+
+	return intr, err
 }
