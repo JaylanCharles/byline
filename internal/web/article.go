@@ -256,17 +256,18 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		return
 	}
 
+	uc := ctx.MustGet("users").(ijwt.UserClaims)
+
 	var eg errgroup.Group
 	var art domain.Article
 	eg.Go(func() error {
-		art, err = h.svc.GetPublishedById(ctx, id)
+		art, err = h.svc.GetPublishedById(ctx, id, uc.Uid)
 		return err
 	})
 
 	var intr domain.Interactive
 	eg.Go(func() error {
 		// 要在这里获得这篇文章的计数
-		uc := ctx.MustGet("users").(*ijwt.UserClaims)
 		// 这个地方可以容忍错误
 		intr, err = h.intrSvc.Get(ctx, h.biz, id, uc.Uid)
 		// 这种是容错的写法
