@@ -95,8 +95,8 @@ func (repo *CachedArticleRepository) List(ctx context.Context, uid int64, offset
 	})
 	// 回写缓存的时候，可以同步，也可以异步
 	go func() {
-		err := repo.cache.SetFirstPage(ctx, uid, data)
-		repo.l.Error("回写缓存失败", logger.Error(err))
+		er := repo.cache.SetFirstPage(ctx, uid, data)
+		repo.l.Error("回写缓存失败", logger.Error(er))
 		repo.preCache(ctx, data)
 	}()
 	return data, nil
@@ -120,8 +120,7 @@ func (repo *CachedArticleRepository) GetByID(ctx context.Context, id int64) (dom
 	return repo.toDomain(data), nil
 }
 
-func (repo *CachedArticleRepository) GetPublishedById(
-	ctx context.Context, id int64) (domain.Article, error) {
+func (repo *CachedArticleRepository) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
 	// 读取线上库数据，如果你的 Content 被你放过去了 OSS 上，你就要让前端去读 Content 字段
 	art, err := repo.dao.GetPubById(ctx, id)
 	if err != nil {
