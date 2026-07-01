@@ -40,8 +40,6 @@ func InitWebServer() *App {
 	smsService := ioc.InitSMSService()
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService, handler)
-	wechatService := ioc.InitOAuth2WechatService(logger)
-	oAuth2WechatHandler := web.NewOAuth2WechatHandler(wechatService, userService, handler)
 	articleDAO := article.NewGORMArticleDAO(db)
 	articleRepository := repository.NewCachedArticleRepository(articleDAO, logger)
 	client := ioc.InitKafka()
@@ -53,7 +51,7 @@ func InitWebServer() *App {
 	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
 	interactiveService := service.NewInteractiveService(interactiveRepository, logger)
 	articleHandler := web.NewArticleHandler(articleService, interactiveService, logger)
-	engine := ioc.InitWebServer(v, userHandler, oAuth2WechatHandler, articleHandler)
+	engine := ioc.InitWebServer(v, userHandler, articleHandler)
 	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, logger, interactiveRepository)
 	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
 	app := &App{

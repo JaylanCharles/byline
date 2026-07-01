@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
@@ -12,7 +14,8 @@ import (
 
 func main() {
 	initLogger()
-	initViperRemote()
+	initViper()
+	initPrometheus()
 	app := InitWebServer()
 	for _, c := range app.consumers {
 		err := c.Start()
@@ -58,4 +61,11 @@ func initLogger() {
 		panic(err)
 	}
 	zap.ReplaceGlobals(logger)
+}
+
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8081", nil)
+	}()
 }

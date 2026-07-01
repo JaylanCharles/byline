@@ -60,7 +60,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_sms/code/send", u.SendLoginSMSCode)
 	ug.POST("/login_sms", u.LoginSMS)
 	ug.GET("/refresh_token", u.RefreshToken)
-	ug.GET("/refresh_token", u.LogoutJWT)
+	ug.GET("/logout", u.LogoutJWT)
 }
 func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 	type Req struct {

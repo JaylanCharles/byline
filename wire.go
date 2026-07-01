@@ -49,11 +49,11 @@ func InitWebServer() *App {
 		service.NewInteractiveService,
 
 		ioc.InitSMSService,
-		ioc.InitOAuth2WechatService,
+		//ioc.InitOAuth2WechatService,
 
 		web.NewUserHandler,
 		web.NewArticleHandler,
-		web.NewOAuth2WechatHandler,
+		//web.NewOAuth2WechatHandler,
 		ijwt.NewRedisJWTHandler,
 
 		ioc.InitMiddlewares,

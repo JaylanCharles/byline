@@ -1,47 +1,52 @@
 package ioc
 
 import (
-	"context"
 	"strings"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
-	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/logger"
+	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/metric"
 	loggerMy "github.com/JaylanCharles/byline/pkg/logger"
-	"github.com/fsnotify/fsnotify"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 )
 
 // 这个方法一定是不稳定的，意思就是以后可能经常改，这是不可避免的
-func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, oauth2WechatHdl *web.OAuth2WechatHandler, articleHdl *web.ArticleHandler) *gin.Engine {
+// 为了运行项目，oauth2WechatHdl *web.OAuth2WechatHandler 先不注入
+func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, articleHdl *web.ArticleHandler) *gin.Engine {
 	server := gin.Default()
 	server.Use(mdls...)
 	hdl.RegisterRoutes(server)
-	oauth2WechatHdl.RegisterRoutes(server)
+	//oauth2WechatHdl.RegisterRoutes(server)
 	articleHdl.RegisterRoutes(server)
 	return server
 }
 
 // 这里是最能体现依赖注入的，redisClient redis.Cmdable 我只需要这个，具体怎么来的我不管
 func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l loggerMy.Logger) []gin.HandlerFunc {
-	bd := logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
-		l.Debug("HTTP 请求", loggerMy.Field{
-			Key:   "al",
-			Value: al,
-		})
-	}).AllowReqBody(true).AllowRespBody()
-	viper.OnConfigChange(func(in fsnotify.Event) {
-		ok := viper.GetBool("web.logreq")
-		bd.AllowReqBody(ok)
-	})
+	//bd := logger.NewBuilder(func(ctx context.Context, al *logger.AccessLog) {
+	//	l.Debug("HTTP 请求", loggerMy.Field{
+	//		Key:   "al",
+	//		Value: al,
+	//	})
+	//}).AllowReqBody(true).AllowRespBody()
+	//viper.OnConfigChange(func(in fsnotify.Event) {
+	//	ok := viper.GetBool("web.logreq")
+	//	bd.AllowReqBody(ok)
+	//})
 	return []gin.HandlerFunc{
 		corsHdl(),
-		bd.Build(),
+		(&metric.MiddlewareBuilder{
+			Namespace:  "dev",
+			Subsystem:  "byline",
+			Name:       "gin_http", // 千万不要使用连字符
+			Help:       "统计 GIN 的 HTTP 接口",
+			InstanceID: "my-instance-1", // 这个可以使用连字符
+		}).Build(),
+		//bd.Build(),
 		middleware.NewLoginJWTMiddlewareBuilder(jwtHdl).
 			IgorePaths("/users/signup").
 			IgorePaths("/users/login_sms/code/send").
