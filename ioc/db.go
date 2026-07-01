@@ -9,6 +9,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
+	"gorm.io/plugin/prometheus"
 )
 
 func InitDB(l logger.Logger) *gorm.DB {
@@ -34,6 +35,20 @@ func InitDB(l logger.Logger) *gorm.DB {
 	// 只会在初始化过程中使用 panic
 	// panic 相当于整个 goroutine 结束
 	// 一旦初始化过程出错，应用就不要启动了
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.Use(prometheus.New(prometheus.Config{
+		DBName:          "byline",
+		RefreshInterval: 15,
+		StartServer:     false,
+		MetricsCollector: []prometheus.MetricsCollector{
+			&prometheus.MySQL{
+				VariableNames: []string{"thread_running"},
+			},
+		},
+	}))
 	if err != nil {
 		panic(err)
 	}
