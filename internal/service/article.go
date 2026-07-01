@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/JaylanCharles/byline/internal/domain"
+	events "github.com/JaylanCharles/byline/internal/events/article"
 	"github.com/JaylanCharles/byline/internal/repository"
+	"github.com/JaylanCharles/byline/pkg/logger"
 )
 
 type ArticleService interface {
@@ -13,16 +15,20 @@ type ArticleService interface {
 	Withdraw(ctx context.Context, art domain.Article) error
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
-	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
 }
 
 type articleService struct {
-	repo repository.ArticleRepository
+	repo     repository.ArticleRepository
+	producer events.Producer
+	l        logger.Logger
 }
 
-func NewArticleService(repo repository.ArticleRepository) ArticleService {
+func NewArticleService(repo repository.ArticleRepository, producer events.Producer, l logger.Logger) ArticleService {
 	return &articleService{
-		repo: repo,
+		repo:     repo,
+		l:        l,
+		producer: producer,
 	}
 }
 
@@ -52,7 +58,22 @@ func (svc *articleService) GetById(ctx context.Context, id int64) (domain.Articl
 	return svc.repo.GetByID(ctx, id)
 }
 
-func (svc *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
+func (svc *articleService) GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error) {
 	// 另一个选项，在这里组装 Author，调用 UserService
-	return svc.repo.GetPublishedById(ctx, id)
+	art, err := svc.repo.GetPublishedById(ctx, id)
+	if err == nil {
+		go func() {
+			er := svc.producer.ProduceReadEvent(ctx, events.ReadEvent{
+				// 即便你的消费者要用 art 的里面的数据，
+				// 让它去查询，你不要在 event 里面带
+				Uid: uid,
+				Aid: id,
+			})
+			if er != nil {
+				svc.l.Error("发送读者阅读事件失败")
+			}
+		}()
+	}
+
+	return art, err
 }
