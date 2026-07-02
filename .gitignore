@@ -3,3 +3,4 @@ docs/
 byline
 mongodb/
 sarama/
+opentelemetry/

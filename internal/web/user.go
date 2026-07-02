@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/JaylanCharles/byline/internal/domain"
+	"github.com/JaylanCharles/byline/internal/errs"
 	"github.com/JaylanCharles/byline/internal/service"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	regexp "github.com/dlclark/regexp2"
@@ -60,7 +61,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_sms/code/send", u.SendLoginSMSCode)
 	ug.POST("/login_sms", u.LoginSMS)
 	ug.GET("/refresh_token", u.RefreshToken)
-	ug.GET("/refresh_token", u.LogoutJWT)
+	ug.GET("/logout", u.LogoutJWT)
 }
 func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 	type Req struct {
@@ -267,7 +268,10 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	user, err := u.svc.Login(ctx, req.Email, req.Password)
 	if errors.Is(err, service.ErrInvalidUserOrPassword) {
 		// 记录日志
-		ctx.String(http.StatusOK, "用户名或密码不对")
+		ctx.JSON(http.StatusOK, Result{
+			Code: errs.UserInvalidOrPassword,
+			Msg:  "用户不存在或者密码错误",
+		})
 		return
 	}
 	if err != nil {
