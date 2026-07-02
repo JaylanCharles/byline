@@ -7,10 +7,12 @@ import (
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/internal/web/middleware"
+	"github.com/JaylanCharles/byline/pkg/ginx"
 	"github.com/JaylanCharles/byline/pkg/ginx/middlewares/metric"
 	loggerMy "github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -37,6 +39,12 @@ func InitMiddlewares(redisClient redis.Cmdable, jwtHdl ijwt.Handler, l loggerMy.
 	//	ok := viper.GetBool("web.logreq")
 	//	bd.AllowReqBody(ok)
 	//})
+	ginx.InitCounter(prometheus.CounterOpts{
+		Namespace: "dev",
+		Subsystem: "byline",
+		Name:      "http_biz_code",
+		Help:      "HTTP 的业务错误码",
+	})
 	return []gin.HandlerFunc{
 		corsHdl(),
 		(&metric.MiddlewareBuilder{
