@@ -1,6 +1,16 @@
-.idea/
-docs/
-byline
-mongodb/
-sarama/
-opentelemetry/
+# 前导 / 表示根目录；不添加 / 表示任意层级
+# 后导 / 表示只目录；不添加 / 表示目录和文件
+
+# idea 配置
+/.idea/
+
+# 文档
+/docs/
+
+# 编译产物
+/byline
+
+# 中间件学习
+/mongodb/
+/sarama/
+/opentelemetry/
