@@ -14,7 +14,11 @@
 # 编译产物
 /byline
 
+# 语法学习
+/syntax/
+
 # 中间件学习
 /mongodb/
 /sarama/
 /opentelemetry/
+/cronjob/

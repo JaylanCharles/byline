@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
 	events "github.com/JaylanCharles/byline/internal/events/article"
@@ -9,11 +10,14 @@ import (
 	"github.com/JaylanCharles/byline/pkg/logger"
 )
 
+//go:generate mockgen -source=./article.go -destination=./mocks/article.mock.go -package=svcmocks
 type ArticleService interface {
 	Save(ctx context.Context, art domain.Article) (int64, error)
 	Publish(ctx context.Context, art domain.Article) (int64, error)
 	Withdraw(ctx context.Context, art domain.Article) error
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
+	// ListPub 只会取 start 七天内的数据
+	ListPub(ctx context.Context, start time.Time, offset, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
 	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
 }
@@ -30,6 +34,11 @@ func NewArticleService(repo repository.ArticleRepository, producer events.Produc
 		l:        l,
 		producer: producer,
 	}
+}
+
+func (svc *articleService) ListPub(ctx context.Context, start time.Time, offset, limit int) ([]domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (svc *articleService) Withdraw(ctx context.Context, art domain.Article) error {
