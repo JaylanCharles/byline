@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/prometheus"
+
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 func InitDB(l logger.Logger) *gorm.DB {
@@ -61,6 +63,17 @@ func InitDB(l logger.Logger) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
+
+	db.Use(tracing.NewPlugin(tracing.WithDBSystem("byline"),
+		tracing.WithQueryFormatter(func(query string) string {
+			l.Debug("", logger.String("query", query))
+			return query
+
+		}),
+		// 不要记录 metrics
+		tracing.WithoutMetrics(),
+		// 不要记录查询参数
+		tracing.WithoutQueryVariables()))
 
 	err = dao.InitTable(db)
 	if err != nil {
