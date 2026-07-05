@@ -32,7 +32,8 @@ func NewBatchRankingService(artSvc ArticleService, intrSvc InteractiveService) *
 		batchSize: 100,
 		n:         100,
 		scoreFunc: func(t time.Time, likeCnt int64) float64 {
-			return float64(likeCnt-1) / math.Pow(float64(likeCnt+2), 1.5)
+			sec := time.Since(t).Seconds()
+			return float64(likeCnt-1) / math.Pow(sec+2, 1.5)
 		},
 	}
 }
@@ -77,8 +78,8 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 		}
 
 		ids := slice.Map[domain.Article, int64](arts, func(idx int, src domain.Article) int64 {
-				return src.Id
-			})
+			return src.Id
+		})
 
 		// 要去找到对应的点赞数据
 		intrs, err := svc.intrSvc.GetByIds(ctx, "article", ids)
@@ -111,7 +112,8 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 		}
 
 		// 当前一批都没取够，可以肯定没有下一批了
-		if len(arts) < svc.batchSize {
+		// 又或者已经取到了七天之前的数据了，说明可以中断了
+		if len(arts) < svc.batchSize || now.Sub(arts[len(arts)-1].Utime).Hours() > 7*24 {
 			break
 		}
 
