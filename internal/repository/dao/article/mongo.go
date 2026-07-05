@@ -13,7 +13,7 @@ import (
 
 type MongoDBDAO struct {
 	client *mongo.Client
-	// 代表 webook 的
+	// 代表 byline 的
 	database *mongo.Database
 	// 代表的是制作库
 	col *mongo.Collection
