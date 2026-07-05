@@ -13,7 +13,7 @@ import (
 )
 
 func InitOTEL() func(ctx context.Context) {
-	res, err := newResource("webook", "v0.0.1")
+	res, err := newResource("byline", "v0.0.1")
 	if err != nil {
 		panic(err)
 	}
