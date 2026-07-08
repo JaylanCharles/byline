@@ -28,6 +28,9 @@ func main() {
 			panic(err)
 		}
 	}
+
+	app.cron.Start()
+
 	server := app.web
 	server.Run(":8080")
 
@@ -35,6 +38,15 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	closeFunc(ctx)
+
+	ctx = app.cron.Stop()
+	// 想办法 close ？？
+	// 这边可以考虑超时强制退出，防止有些任务，执行特别长的时间
+	tm := time.NewTimer(time.Minute * 10)
+	select {
+	case <-tm.C:
+	case <-ctx.Done():
+	}
 }
 
 func initViperRemote() {

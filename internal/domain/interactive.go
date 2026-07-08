@@ -1,6 +1,9 @@
 package domain
 
 type Interactive struct {
+	BizId int64
+	Biz   string
+
 	ReadCnt    int64 `json:"read_cnt"`
 	LikeCnt    int64 `json:"like_cnt"`
 	CollectCnt int64 `json:"collect_cnt"`

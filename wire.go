@@ -19,37 +19,21 @@ import (
 // func 名字随便
 func InitWebServer() *App {
 	wire.Build(
-		// 最基础的第三方依赖
-		ioc.InitDB, ioc.InitRedis, ioc.InitLogger,
-		ioc.InitKafka,
-		ioc.NewConsumers,
-		ioc.NewSyncProducer,
+		thirdPartySet,
+		interactiveServiceSet,
+		rankingServiceSet,
+		userServiceSet,
+		articlServiceSet,
+		codeServiceSet,
 
 		// consumer
 		article.NewInteractiveReadEventConsumer,
 		article.NewKafkaProducer,
 
-		//初始化 DAO
-		dao.NewUserDAO,
-		articleDAO.NewGORMArticleDAO,
-		dao.NewGORMInteractiveDAO,
-
-		cache.NewUserCache,
-		cache.NewCodeCache,
-		cache.NewRedisInteractiveCache,
-
-		repository.NewUserRepository,
-		repository.NewCodeRepository,
-		repository.NewCachedArticleRepository,
-		repository.NewCachedInteractiveRepository,
-
-		service.NewUserService,
-		service.NewArticleService,
-		service.NewCodeService,
-		service.NewInteractiveService,
-
 		ioc.InitSMSService,
 		//ioc.InitOAuth2WechatService,
+		ioc.InitJobs,
+		ioc.InitRankingJob,
 
 		web.NewUserHandler,
 		web.NewArticleHandler,
@@ -64,3 +48,46 @@ func InitWebServer() *App {
 	)
 	return new(App)
 }
+
+var thirdPartySet = wire.NewSet(
+	// 最基础的第三方依赖
+	ioc.InitLogger,
+	ioc.InitRedis,
+	ioc.InitRLockClient,
+	ioc.InitDB,
+	ioc.InitKafka,
+	ioc.NewConsumers,
+	ioc.NewSyncProducer,
+)
+
+var interactiveServiceSet = wire.NewSet(
+	service.NewInteractiveService,
+	repository.NewCachedInteractiveRepository,
+	dao.NewGORMInteractiveDAO,
+	cache.NewRedisInteractiveCache,
+)
+
+var rankingServiceSet = wire.NewSet(
+	service.NewBatchRankingService,
+	repository.NewCachedRankingRepository,
+	cache.NewRankingRedisCache,
+)
+
+var userServiceSet = wire.NewSet(
+	service.NewUserService,
+	repository.NewUserRepository,
+	cache.NewUserCache,
+	dao.NewUserDAO,
+)
+
+var articlServiceSet = wire.NewSet(
+	service.NewArticleService,
+	repository.NewCachedArticleRepository,
+	articleDAO.NewGORMArticleDAO,
+)
+
+var codeServiceSet = wire.NewSet(
+	service.NewCodeService,
+	repository.NewCodeRepository,
+	cache.NewCodeCache,
+)

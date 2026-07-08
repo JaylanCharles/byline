@@ -31,6 +31,11 @@ func NewMongoDBDAO(db *mongo.Database, node *snowflake.Node) ArticleDAO {
 	}
 }
 
+func (m *MongoDBDAO) ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]Article, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MongoDBDAO) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
 	//TODO implement me
 	panic("implement me")
