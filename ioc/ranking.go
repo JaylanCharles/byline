@@ -10,9 +10,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func InitRankingJob(svc service.RankingService,
-	rlockClient *rlock.Client,
-	l logger.Logger) *job.RankingJob {
+func InitRankingJob(svc service.RankingService, rlockClient *rlock.Client, l logger.Logger) *job.RankingJob {
 	return job.NewRankingJob(svc, rlockClient, l, time.Second*30)
 }
 

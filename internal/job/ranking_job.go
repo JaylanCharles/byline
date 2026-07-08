@@ -7,6 +7,7 @@ import (
 
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/pkg/logger"
+	rlock "github.com/gotomicro/redis-lock"
 )
 
 type RankingJob struct {
