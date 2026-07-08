@@ -16,6 +16,7 @@ import (
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/ioc"
+	"github.com/google/wire"
 )
 
 import (
@@ -54,9 +55,28 @@ func InitWebServer() *App {
 	engine := ioc.InitWebServer(v, userHandler, articleHandler)
 	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, logger, interactiveRepository)
 	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
+	rankingService := service.NewBatchRankingService(articleService, interactiveService)
+	rlockClient := ioc.InitRLockClient(cmdable)
+	rankingJob := ioc.InitRankingJob(rankingService, rlockClient, logger)
+	cron := ioc.InitJobs(logger, rankingJob)
 	app := &App{
 		web:       engine,
 		consumers: v2,
+		cron:      cron,
 	}
 	return app
 }
+
+// wire.go:
+
+var thirdPartySet = wire.NewSet(ioc.InitLogger, ioc.InitRedis, ioc.InitRLockClient, ioc.InitDB, ioc.InitKafka, ioc.NewConsumers, ioc.NewSyncProducer)
+
+var interactiveServiceSet = wire.NewSet(service.NewInteractiveService, repository.NewCachedInteractiveRepository, dao.NewGORMInteractiveDAO, cache.NewRedisInteractiveCache)
+
+var rankingServiceSet = wire.NewSet(service.NewBatchRankingService, repository.NewCachedRankingRepository, cache.NewRankingRedisCache)
+
+var userServiceSet = wire.NewSet(service.NewUserService, repository.NewUserRepository, cache.NewUserCache, dao.NewUserDAO)
+
+var articlServiceSet = wire.NewSet(service.NewArticleService, repository.NewCachedArticleRepository, article.NewGORMArticleDAO)
+
+var codeServiceSet = wire.NewSet(service.NewCodeService, repository.NewCodeRepository, cache.NewCodeCache)

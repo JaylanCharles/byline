@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
 	"math"
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
+	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/ecodeclub/ekit/queue"
 	"github.com/ecodeclub/ekit/slice"
 )
@@ -19,13 +19,14 @@ type RankingService interface {
 type BatchRankingService struct {
 	artSvc    ArticleService
 	intrSvc   InteractiveService
+	repo      repository.RankingRepository
 	batchSize int
 	n         int
 	// scoreFunc 不能返回负数
 	scoreFunc func(t time.Time, likeCnt int64) float64
 }
 
-func NewBatchRankingService(artSvc ArticleService, intrSvc InteractiveService) *BatchRankingService {
+func NewBatchRankingService(artSvc ArticleService, intrSvc InteractiveService) RankingService {
 	return &BatchRankingService{
 		artSvc:    artSvc,
 		intrSvc:   intrSvc,
@@ -44,8 +45,7 @@ func (svc *BatchRankingService) TopN(ctx context.Context) error {
 		return err
 	}
 	// 在这里，存起来
-	log.Println(arts)
-	return nil
+	return svc.repo.ReplaceTopN(ctx, arts)
 }
 
 func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, error) {
