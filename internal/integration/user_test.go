@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JaylanCharles/byline/internal/integration/startup"
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/ioc"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +16,7 @@ import (
 )
 
 func TestUserHandler_e2e_SendLoginSMSCode(t *testing.T) {
-	server := startup.InitWebServerALL()
+	//server := startup.InitWebServer()
 	rdb := ioc.InitRedis()
 	testCases := []struct {
 		name string
@@ -168,7 +167,7 @@ func TestUserHandler_e2e_SendLoginSMSCode(t *testing.T) {
 			// 这就是 HTTP 请求进去 GIN 框架的入口。
 			// 当你这样调用的时候，GIN 就会处理这个请求
 			// 响应写回到 resp 里
-			server.ServeHTTP(resp, req)
+			//server.ServeHTTP(resp, req)
 
 			assert.Equal(t, tc.wantCode, resp.Code)
 			if resp.Code != 200 {

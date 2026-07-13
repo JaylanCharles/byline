@@ -53,7 +53,7 @@ func NewRedisInteractiveCache(client redis.Cmdable) InteractiveCache {
 }
 
 func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error {
-	return r.client.Eval(ctx, luaIncrCnt, []string{r.key(biz, bizId), fieldCollectCnt}, 1).Err()
+	return r.client.Eval(ctx, luaIncrCnt, []string{r.key(biz, bizId)}, fieldCollectCnt, 1).Err()
 }
 
 func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context, biz string, bizId int64) error {
@@ -106,6 +106,7 @@ func (r *RedisInteractiveCache) Get(ctx context.Context, biz string, bizId int64
 
 	return domain.Interactive{
 		// 懒惰的写法
+		BizId:      bizId,
 		CollectCnt: collectCnt,
 		LikeCnt:    likeCnt,
 		ReadCnt:    readCnt,
