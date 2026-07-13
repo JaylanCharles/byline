@@ -3,65 +3,116 @@
 package startup
 
 import (
+	"github.com/JaylanCharles/byline/internal/events/article"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
-	"github.com/JaylanCharles/byline/internal/repository/dao/article"
+	articleDAO "github.com/JaylanCharles/byline/internal/repository/dao/article"
+
 	"github.com/JaylanCharles/byline/internal/service"
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/ioc"
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
 // func 名字随便
-func InitWebServerALL() *gin.Engine {
+func InitWebServer() *App {
 	wire.Build(
 		thirdPartySet,
-		userSvcProvider,
-		articlSvcProvider,
+		interactiveServiceSet,
+		rankingServiceSet,
+		userServiceSet,
+		articlServiceSet,
+		codeServiceSet,
 
-		cache.NewCodeCache,
+		// consumer
+		article.NewInteractiveReadEventConsumer,
+		article.NewKafkaProducer,
 
-		repository.NewCodeRepository,
-
-		service.NewCodeService,
 		ioc.InitSMSService,
-		InitOAuth2WechatService,
+		//ioc.InitOAuth2WechatService,
+		ioc.InitJobs,
+		ioc.InitRankingJob,
 
 		web.NewUserHandler,
-		web.NewOAuth2WechatHandler,
 		web.NewArticleHandler,
+		//web.NewOAuth2WechatHandler,
 		ijwt.NewRedisJWTHandler,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
+
+		// 组装我这个结构体的所有字段
+		wire.Struct(new(App), "*"),
 	)
-	return new(gin.Engine) // 没有什么作用，就是单纯让语法不出错
+	return new(App)
 }
 
-func InitArticleHandler(dao article.ArticleDAO) *web.ArticleHandler {
-	wire.Build(
-		thirdPartySet,
+func InitInteractiveService() service.InteractiveService {
+	wire.Build(thirdPartySet, interactiveServiceSet)
+	return service.NewInteractiveService(nil, nil)
+}
+
+func InitArticleHandler(dao articleDAO.ArticleDAO) *web.ArticleHandler {
+	wire.Build(thirdPartySet,
+		interactiveServiceSet,
+		article.NewKafkaProducer,
 		repository.NewCachedArticleRepository,
 		service.NewArticleService,
-		web.NewArticleHandler,
-	)
-	return &web.ArticleHandler{}
+		web.NewArticleHandler)
+	return new(web.ArticleHandler)
 }
 
-var thirdPartySet = wire.NewSet( // 第三方依赖
-	InitRedis, InitDB,
-	InitLogger)
+func InitUserSvc() service.UserService {
+	wire.Build(thirdPartySet, userServiceSet)
+	return service.NewUserService(nil, nil)
+}
 
-var userSvcProvider = wire.NewSet(
-	dao.NewUserDAO,
-	cache.NewUserCache,
+func InitJwtHdl() ijwt.Handler {
+	wire.Build(thirdPartySet, ijwt.NewRedisJWTHandler)
+	return ijwt.NewRedisJWTHandler(nil)
+}
+
+var thirdPartySet = wire.NewSet(
+	// 最基础的第三方依赖
+	InitLogger,
+	InitRedis,
+	ioc.InitRLockClient,
+	InitDB,
+	InitKafka,
+	ioc.NewConsumers,
+	ioc.NewSyncProducer,
+)
+
+var interactiveServiceSet = wire.NewSet(
+	service.NewInteractiveService,
+	repository.NewCachedInteractiveRepository,
+	dao.NewGORMInteractiveDAO,
+	cache.NewRedisInteractiveCache,
+)
+
+var rankingServiceSet = wire.NewSet(
+	service.NewBatchRankingService,
+	repository.NewCachedRankingRepository,
+	cache.NewRankingRedisCache,
+)
+
+var userServiceSet = wire.NewSet(
+	service.NewUserService,
 	repository.NewUserRepository,
-	service.NewUserService)
+	cache.NewUserCache,
+	dao.NewUserDAO,
+)
 
-var articlSvcProvider = wire.NewSet(
+var articlServiceSet = wire.NewSet(
+	service.NewArticleService,
 	repository.NewCachedArticleRepository,
-	article.NewGORMArticleDAO,
-	service.NewArticleService)
+	articleDAO.NewGORMArticleDAO,
+)
+
+var codeServiceSet = wire.NewSet(
+	service.NewCodeService,
+	repository.NewCodeRepository,
+	cache.NewCodeCache,
+)
