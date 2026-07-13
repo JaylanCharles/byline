@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/JaylanCharles/byline/internal/domain"
-	"github.com/JaylanCharles/byline/internal/repository"
+	"github.com/JaylanCharles/byline/interactive/domain"
+	"github.com/JaylanCharles/byline/interactive/repository"
 	"github.com/JaylanCharles/byline/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )

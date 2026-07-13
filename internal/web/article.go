@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	domain2 "github.com/JaylanCharles/byline/interactive/domain"
+	service2 "github.com/JaylanCharles/byline/interactive/service"
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
@@ -20,12 +22,12 @@ var _ handler = (*ArticleHandler)(nil)
 
 type ArticleHandler struct {
 	svc     service.ArticleService
-	intrSvc service.InteractiveService
+	intrSvc service2.InteractiveService
 	l       logger.Logger
 	biz     string
 }
 
-func NewArticleHandler(svc service.ArticleService, intrSvc service.InteractiveService, l logger.Logger) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, intrSvc service2.InteractiveService, l logger.Logger) *ArticleHandler {
 	return &ArticleHandler{
 		svc:     svc,
 		intrSvc: intrSvc,
@@ -265,7 +267,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		return err
 	})
 
-	var intr domain.Interactive
+	var intr domain2.Interactive
 	eg.Go(func() error {
 		// 要在这里获得这篇文章的计数
 		// 这个地方可以容忍错误

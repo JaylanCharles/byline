@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JaylanCharles/byline/internal/domain"
-	"github.com/JaylanCharles/byline/internal/integration/startup"
-	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/interactive/domain"
+	"github.com/JaylanCharles/byline/interactive/integration/startup"
+	"github.com/JaylanCharles/byline/interactive/repository/dao"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

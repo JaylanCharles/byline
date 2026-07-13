@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/JaylanCharles/byline/internal/domain"
-	"github.com/JaylanCharles/byline/internal/repository/cache"
-	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/interactive/domain"
+	"github.com/JaylanCharles/byline/interactive/repository/cache"
+	"github.com/JaylanCharles/byline/interactive/repository/dao"
 	"github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/ecodeclub/ekit/slice"
 )

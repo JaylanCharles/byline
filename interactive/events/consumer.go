@@ -1,11 +1,11 @@
-package article
+package events
 
 import (
 	"context"
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/JaylanCharles/byline/internal/repository"
+	"github.com/JaylanCharles/byline/interactive/repository"
 	"github.com/JaylanCharles/byline/pkg/logger"
 	"github.com/JaylanCharles/byline/pkg/saramax"
 )
