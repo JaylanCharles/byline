@@ -15,6 +15,10 @@ type InteractiveServiceServer struct {
 	svc service.InteractiveService
 }
 
+func NewInteractiveServiceServer(svc service.InteractiveService) *InteractiveServiceServer {
+	return &InteractiveServiceServer{svc: svc}
+}
+
 func (i *InteractiveServiceServer) IncrReadCnt(ctx context.Context, request *intrv1.IncrReadCntRequest) (*intrv1.IncrReadCntResponse, error) {
 	err := i.svc.IncrReadCnt(ctx, request.GetBiz(), request.GetBizId())
 	return &intrv1.IncrReadCntResponse{}, err

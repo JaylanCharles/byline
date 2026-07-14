@@ -3,6 +3,7 @@
 package startup
 
 import (
+	"github.com/JaylanCharles/byline/interactive/grpc"
 	"github.com/JaylanCharles/byline/interactive/repository"
 	"github.com/JaylanCharles/byline/interactive/repository/cache"
 	"github.com/JaylanCharles/byline/interactive/repository/dao"
@@ -10,9 +11,14 @@ import (
 	"github.com/google/wire"
 )
 
-func InitInteractiveService() service2.InteractiveService {
+func InitInteractiveService() service.InteractiveService {
 	wire.Build(thirdPartySet, interactiveServiceSet)
-	return service2.NewInteractiveService(nil, nil)
+	return service.NewInteractiveService(nil, nil)
+}
+
+func InitInteractiveGRPCServer() *grpc.InteractiveServiceServer {
+	wire.Build(thirdPartySet, interactiveServiceSet, grpc.NewInteractiveServiceServer)
+	return new(grpc.InteractiveServiceServer)
 }
 
 var thirdPartySet = wire.NewSet(

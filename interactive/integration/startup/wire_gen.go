@@ -7,6 +7,7 @@
 package startup
 
 import (
+	"github.com/JaylanCharles/byline/interactive/grpc"
 	"github.com/JaylanCharles/byline/interactive/repository"
 	"github.com/JaylanCharles/byline/interactive/repository/cache"
 	"github.com/JaylanCharles/byline/interactive/repository/dao"
@@ -25,6 +26,18 @@ func InitInteractiveService() service.InteractiveService {
 	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
 	interactiveService := service.NewInteractiveService(interactiveRepository, logger)
 	return interactiveService
+}
+
+func InitInteractiveGRPCServer() *grpc.InteractiveServiceServer {
+	db := InitDB()
+	interactiveDAO := dao.NewGORMInteractiveDAO(db)
+	cmdable := InitRedis()
+	interactiveCache := cache.NewRedisInteractiveCache(cmdable)
+	logger := InitLogger()
+	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
+	interactiveService := service.NewInteractiveService(interactiveRepository, logger)
+	interactiveServiceServer := grpc.NewInteractiveServiceServer(interactiveService)
+	return interactiveServiceServer
 }
 
 // wire.go:
