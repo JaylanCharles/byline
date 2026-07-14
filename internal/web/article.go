@@ -27,12 +27,11 @@ type ArticleHandler struct {
 	biz     string
 }
 
-func NewArticleHandler(svc service.ArticleService, intrSvc service2.InteractiveService, l logger.Logger) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, l logger.Logger) *ArticleHandler {
 	return &ArticleHandler{
-		svc:     svc,
-		intrSvc: intrSvc,
-		l:       l,
-		biz:     "article",
+		svc: svc,
+		l:   l,
+		biz: "article",
 	}
 }
 

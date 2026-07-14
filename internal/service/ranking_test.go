@@ -62,7 +62,7 @@ func TestRankingTopN(t *testing.T) {
 			defer ctrl.Finish()
 
 			artSvc, intrSvc := tc.mock(ctrl)
-			svc := NewBatchRankingService(artSvc, intrSvc)
+			svc := NewBatchRankingService(artSvc, intrSvc).(*BatchRankingService)
 			svc.batchSize = 3
 			svc.n = 3
 			svc.scoreFunc = func(t time.Time, likeCnt int64) float64 {

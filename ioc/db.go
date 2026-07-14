@@ -3,6 +3,7 @@ package ioc
 import (
 	"time"
 
+	dao2 "github.com/JaylanCharles/byline/interactive/repository/dao"
 	"github.com/JaylanCharles/byline/internal/repository/dao"
 	"github.com/JaylanCharles/byline/pkg/logger"
 	promsdk "github.com/prometheus/client_golang/prometheus"
@@ -79,6 +80,12 @@ func InitDB(l logger.Logger) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
+
+	err = dao2.InitTable(db)
+	if err != nil {
+		panic(err)
+	}
+
 	return db
 }
 

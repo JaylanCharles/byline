@@ -7,11 +7,6 @@
 package startup
 
 import (
-	"github.com/JaylanCharles/byline/interactive/events"
-	repository2 "github.com/JaylanCharles/byline/interactive/repository"
-	cache2 "github.com/JaylanCharles/byline/interactive/repository/cache"
-	dao2 "github.com/JaylanCharles/byline/interactive/repository/dao"
-	service2 "github.com/JaylanCharles/byline/interactive/service"
 	article2 "github.com/JaylanCharles/byline/internal/events/article"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
@@ -21,13 +16,14 @@ import (
 	"github.com/JaylanCharles/byline/internal/web"
 	"github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/ioc"
+	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
 // Injectors from wire.go:
 
 // func 名字随便
-func InitWebServer() *App {
+func InitWebServer() *gin.Engine {
 	cmdable := InitRedis()
 	handler := jwt.NewRedisJWTHandler(cmdable)
 	logger := InitLogger()
@@ -48,35 +44,9 @@ func InitWebServer() *App {
 	syncProducer := ioc.NewSyncProducer(client)
 	producer := article2.NewKafkaProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer, logger)
-	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
-	interactiveCache := cache2.NewRedisInteractiveCache(cmdable)
-	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
-	interactiveService := service2.NewInteractiveService(interactiveRepository, logger)
-	articleHandler := web.NewArticleHandler(articleService, interactiveService, logger)
+	articleHandler := web.NewArticleHandler(articleService, logger)
 	engine := ioc.InitWebServer(v, userHandler, articleHandler)
-	interactiveReadEventConsumer := events.NewInteractiveReadEventConsumer(client, logger, interactiveRepository)
-	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
-	rankingService := service.NewBatchRankingService(articleService, interactiveService)
-	rlockClient := ioc.InitRLockClient(cmdable)
-	rankingJob := ioc.InitRankingJob(rankingService, rlockClient, logger)
-	cron := ioc.InitJobs(logger, rankingJob)
-	app := &App{
-		web:       engine,
-		consumers: v2,
-		cron:      cron,
-	}
-	return app
-}
-
-func InitInteractiveService() service2.InteractiveService {
-	db := InitDB()
-	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
-	cmdable := InitRedis()
-	interactiveCache := cache2.NewRedisInteractiveCache(cmdable)
-	logger := InitLogger()
-	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
-	interactiveService := service2.NewInteractiveService(interactiveRepository, logger)
-	return interactiveService
+	return engine
 }
 
 func InitArticleHandler(dao2 article.ArticleDAO) *web.ArticleHandler {
@@ -86,13 +56,7 @@ func InitArticleHandler(dao2 article.ArticleDAO) *web.ArticleHandler {
 	syncProducer := ioc.NewSyncProducer(client)
 	producer := article2.NewKafkaProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer, logger)
-	db := InitDB()
-	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
-	cmdable := InitRedis()
-	interactiveCache := cache2.NewRedisInteractiveCache(cmdable)
-	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
-	interactiveService := service2.NewInteractiveService(interactiveRepository, logger)
-	articleHandler := web.NewArticleHandler(articleService, interactiveService, logger)
+	articleHandler := web.NewArticleHandler(articleService, logger)
 	return articleHandler
 }
 
@@ -121,8 +85,6 @@ var thirdPartySet = wire.NewSet(
 	InitRedis, ioc.InitRLockClient, InitDB,
 	InitKafka, ioc.NewConsumers, ioc.NewSyncProducer,
 )
-
-var interactiveServiceSet = wire.NewSet(service2.NewInteractiveService, repository2.NewCachedInteractiveRepository, dao2.NewGORMInteractiveDAO, cache2.NewRedisInteractiveCache)
 
 var rankingServiceSet = wire.NewSet(service.NewBatchRankingService, repository.NewCachedRankingRepository, cache.NewRankingRedisCache)
 

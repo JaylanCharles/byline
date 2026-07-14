@@ -3,11 +3,6 @@
 package startup
 
 import (
-	"github.com/JaylanCharles/byline/interactive/events"
-	repository2 "github.com/JaylanCharles/byline/interactive/repository"
-	cache2 "github.com/JaylanCharles/byline/interactive/repository/cache"
-	dao2 "github.com/JaylanCharles/byline/interactive/repository/dao"
-	service2 "github.com/JaylanCharles/byline/interactive/service"
 	"github.com/JaylanCharles/byline/internal/events/article"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
@@ -18,27 +13,26 @@ import (
 	"github.com/JaylanCharles/byline/internal/web"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
 	"github.com/JaylanCharles/byline/ioc"
+	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
 // func 名字随便
-func InitWebServer() *App {
+func InitWebServer() *gin.Engine {
 	wire.Build(
 		thirdPartySet,
-		interactiveServiceSet,
-		rankingServiceSet,
+		//rankingServiceSet,
 		userServiceSet,
 		articlServiceSet,
 		codeServiceSet,
 
 		// consumer
-		events.NewInteractiveReadEventConsumer,
 		article.NewKafkaProducer,
 
 		ioc.InitSMSService,
 		//ioc.InitOAuth2WechatService,
-		ioc.InitJobs,
-		ioc.InitRankingJob,
+		//ioc.InitJobs,
+		//ioc.InitRankingJob,
 
 		web.NewUserHandler,
 		web.NewArticleHandler,
@@ -47,21 +41,12 @@ func InitWebServer() *App {
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
-
-		// 组装我这个结构体的所有字段
-		wire.Struct(new(App), "*"),
 	)
-	return new(App)
-}
-
-func InitInteractiveService() service2.InteractiveService {
-	wire.Build(thirdPartySet, interactiveServiceSet)
-	return service2.NewInteractiveService(nil, nil)
+	return gin.Default()
 }
 
 func InitArticleHandler(dao articleDAO.ArticleDAO) *web.ArticleHandler {
 	wire.Build(thirdPartySet,
-		interactiveServiceSet,
 		article.NewKafkaProducer,
 		repository.NewCachedArticleRepository,
 		service.NewArticleService,
@@ -88,13 +73,6 @@ var thirdPartySet = wire.NewSet(
 	InitKafka,
 	ioc.NewConsumers,
 	ioc.NewSyncProducer,
-)
-
-var interactiveServiceSet = wire.NewSet(
-	service2.NewInteractiveService,
-	repository2.NewCachedInteractiveRepository,
-	dao2.NewGORMInteractiveDAO,
-	cache2.NewRedisInteractiveCache,
 )
 
 var rankingServiceSet = wire.NewSet(
