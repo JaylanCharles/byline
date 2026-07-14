@@ -1,29 +1,40 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net"
 
-	intrv1 "github.com/JaylanCharles/byline/api/proto/gen/intr/v1"
-	"github.com/JaylanCharles/byline/interactive/grpc"
-	grpc2 "google.golang.org/grpc"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	server := grpc2.NewServer()
-	// 这里暂时随便搞一下
-	intrSvc := &grpc.InteractiveServiceServer{}
+	initViper()
+	app := InitAPP()
+	for _, c := range app.consumers {
+		err := c.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
+	err := app.server.Serve()
 
-	intrv1.RegisterInteractiveServiceServer(server, intrSvc)
+	log.Println(err)
+}
 
-	// 监听 8090 端口，你可以随便写
-	l, err := net.Listen("tcp", ":8090")
+func initViper() {
+	cfile := pflag.String("config", "config/config.yaml", "指定配置文件路径")
+	pflag.Parse()
+	viper.SetConfigFile(*cfile)
+	viper.WatchConfig()
+	viper.OnConfigChange(func(in fsnotify.Event) {
+		fmt.Println(in.Name, in.Op)
+		// 重新读新配置
+	})
+
+	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)
 	}
-
-	// 这边会阻塞，类似与 gin.Run
-	err = server.Serve(l)
-
-	log.Println(err)
 }

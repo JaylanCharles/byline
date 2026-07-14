@@ -6,6 +6,7 @@ import (
 	intrv1 "github.com/JaylanCharles/byline/api/proto/gen/intr/v1"
 	domain2 "github.com/JaylanCharles/byline/interactive/domain"
 	"github.com/JaylanCharles/byline/interactive/service"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,6 +18,10 @@ type InteractiveServiceServer struct {
 
 func NewInteractiveServiceServer(svc service.InteractiveService) *InteractiveServiceServer {
 	return &InteractiveServiceServer{svc: svc}
+}
+
+func (i *InteractiveServiceServer) Register(server *grpc.Server) {
+	intrv1.RegisterInteractiveServiceServer(server, i)
 }
 
 func (i *InteractiveServiceServer) IncrReadCnt(ctx context.Context, request *intrv1.IncrReadCntRequest) (*intrv1.IncrReadCntResponse, error) {
