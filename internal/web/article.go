@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	intrv1 "github.com/JaylanCharles/byline/api/proto/gen/intr/v1"
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/service"
 	ijwt "github.com/JaylanCharles/byline/internal/web/jwt"
@@ -20,17 +21,17 @@ var _ handler = (*ArticleHandler)(nil)
 
 type ArticleHandler struct {
 	svc     service.ArticleService
-	intrSvc service.InteractiveService
+	intrSvc intrv1.InteractiveServiceClient
 	l       logger.Logger
 	biz     string
 }
 
-func NewArticleHandler(svc service.ArticleService, intrSvc service.InteractiveService, l logger.Logger) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, l logger.Logger, intrSvc intrv1.InteractiveServiceClient) *ArticleHandler {
 	return &ArticleHandler{
 		svc:     svc,
-		intrSvc: intrSvc,
 		l:       l,
 		biz:     "article",
+		intrSvc: intrSvc,
 	}
 }
 
@@ -57,7 +58,7 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 	// 参数校验，这里不写了
 
 	c := ctx.MustGet("claims")
-	claims, ok := c.(*ijwt.UserClaims)
+	claims, ok := c.(ijwt.UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -95,7 +96,7 @@ func (h *ArticleHandler) Publish(ctx *gin.Context) {
 	// 参数校验，这里不写了
 
 	c := ctx.MustGet("claims")
-	claims, ok := c.(*ijwt.UserClaims)
+	claims, ok := c.(ijwt.UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -136,7 +137,7 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 	// 参数校验，这里不写了
 
 	c := ctx.MustGet("claims")
-	claims, ok := c.(*ijwt.UserClaims)
+	claims, ok := c.(ijwt.UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -256,7 +257,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		return
 	}
 
-	uc := ctx.MustGet("users").(ijwt.UserClaims)
+	uc := ctx.MustGet("claims").(ijwt.UserClaims)
 
 	var eg errgroup.Group
 	var art domain.Article
@@ -265,11 +266,13 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		return err
 	})
 
-	var intr domain.Interactive
+	var getResp *intrv1.GetResponse
 	eg.Go(func() error {
 		// 要在这里获得这篇文章的计数
 		// 这个地方可以容忍错误
-		intr, err = h.intrSvc.Get(ctx, h.biz, id, uc.Uid)
+		getResp, err = h.intrSvc.Get(ctx, &intrv1.GetRequest{
+			Biz: h.biz, BizId: id, Uid: uc.Uid,
+		})
 		// 这种是容错的写法
 		//if err != nil {
 		//	// 记录日志
@@ -292,13 +295,17 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	// 增加阅读计数。
 	go func() {
 		// 开一个 goroutine，异步去执行
-		er := h.intrSvc.IncrReadCnt(ctx, h.biz, art.Id)
+		_, er := h.intrSvc.IncrReadCnt(ctx, &intrv1.IncrReadCntRequest{
+			Biz: h.biz, BizId: art.Id,
+		})
 		if er != nil {
 			h.l.Error("增加阅读计数失败",
 				logger.Int64("aid", art.Id),
 				logger.Error(err))
 		}
 	}()
+
+	intr := getResp.Intr
 
 	ctx.JSON(http.StatusOK, Result{
 		Data: ArticleVO{
@@ -322,9 +329,13 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 func (h *ArticleHandler) Like(ctx *gin.Context, req LikeReq, uc ijwt.UserClaims) (ginx.Result, error) {
 	var err error
 	if req.Like {
-		err = h.intrSvc.Like(ctx, h.biz, req.Id, uc.Uid)
+		_, err = h.intrSvc.Like(ctx, &intrv1.LikeRequest{
+			Biz: h.biz, BizId: req.Id, Uid: uc.Uid,
+		})
 	} else {
-		err = h.intrSvc.CancelLike(ctx, h.biz, req.Id, uc.Uid)
+		_, err = h.intrSvc.CancelLike(ctx, &intrv1.CancelLikeRequest{
+			Biz: h.biz, BizId: req.Id, Uid: uc.Uid,
+		})
 	}
 	if err != nil {
 		return ginx.Result{

@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var ErrRecordNotFound = gorm.ErrRecordNotFound
+var ErrDataNotFound = gorm.ErrRecordNotFound
 
 type InteractiveDAO interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
@@ -19,6 +19,7 @@ type InteractiveDAO interface {
 	Get(ctx context.Context, biz string, bizId int64) (Interactive, error)
 	InsertCollectionBiz(ctx context.Context, cb UserCollectionBiz) error
 	GetCollectionInfo(ctx context.Context, biz string, bizId, uid int64) (UserCollectionBiz, error)
+	GetByIds(ctx context.Context, biz string, ids []int64) ([]Interactive, error)
 }
 
 type GORMInteractiveDAO struct {
@@ -29,6 +30,12 @@ func NewGORMInteractiveDAO(db *gorm.DB) InteractiveDAO {
 	return &GORMInteractiveDAO{
 		db: db,
 	}
+}
+
+func (dao *GORMInteractiveDAO) GetByIds(ctx context.Context, biz string, ids []int64) ([]Interactive, error) {
+	var res []Interactive
+	err := dao.db.WithContext(ctx).Where("biz = ? AND id IN ?", biz, ids).Find(&res).Error
+	return res, err
 }
 
 func (dao *GORMInteractiveDAO) BatchIncrReadCnt(ctx context.Context, bizs []string, ids []int64) error {
@@ -42,12 +49,10 @@ func (dao *GORMInteractiveDAO) BatchIncrReadCnt(ctx context.Context, bizs []stri
 	// 事务本身的开销，A 是 B 的十倍
 	// 刷新 redolog, undolog, binlog 到磁盘，A 是十次，B 是一次
 	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		txDAO := NewGORMInteractiveDAO(tx)
-		for i := range bizs {
-			err := txDAO.IncrReadCnt(ctx, bizs[i], ids[i])
+		// 让调用者保证两者是相等的
+		for i := 0; i < len(bizs); i++ {
+			err := dao.incrReadCnt(tx, bizs[i], ids[i])
 			if err != nil {
-				// 记个日志就拉到
-				// 也可以 return err
 				return err
 			}
 		}
@@ -100,68 +105,65 @@ func (dao *GORMInteractiveDAO) InsertLikeInfo(ctx context.Context, biz string, b
 	// 同时记录点赞，以及更新点赞计数
 	// 首先你需要一张表来记录，谁点给什么资源点了赞
 	now := time.Now().UnixMilli()
-	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 先准备插入点赞记录
-		// 有没有可能已经点赞过了？
-		// 我要不要校验一下，这里必须是没有点赞过。不需要！
+	err := dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
-				"utime":  now,
 				"status": 1,
+				"utime":  now,
 			}),
 		}).Create(&UserLikeBiz{
-			Biz:    biz,
-			BizId:  bizId,
 			Uid:    uid,
-			Status: 1,
 			Ctime:  now,
 			Utime:  now,
+			Biz:    biz,
+			BizId:  bizId,
+			Status: 1,
 		}).Error
 		if err != nil {
 			return err
 		}
-
 		return tx.Clauses(clause.OnConflict{
-			// MySQL 不写
-			//Columns:
 			DoUpdates: clause.Assignments(map[string]any{
-				"like_cnt": gorm.Expr("like_cnt + 1"),
-				"utime":    time.Now().UnixMilli(),
+				"like_cnt": gorm.Expr("`like_cnt`+1"),
+				"utime":    now,
 			}),
 		}).Create(&Interactive{
-			Biz:     biz,
-			BizId:   bizId,
 			LikeCnt: 1,
 			Ctime:   now,
 			Utime:   now,
+			Biz:     biz,
+			BizId:   bizId,
 		}).Error
 	})
+	return err
 }
 
 func (dao *GORMInteractiveDAO) DeleteLikeInfo(ctx context.Context, biz string, bizId, uid int64) error {
 	now := time.Now().UnixMilli()
-	// 控制事务超时
-	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 两个操作
-		// 一个是软删除点赞记录
-		// 一个是减点赞数量
+	err := dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&UserLikeBiz{}).
-			Where("biz=? AND biz_id = ? AND uid = ?", biz, bizId, uid).
+			Where("biz =? AND biz_id = ? AND uid = ?", biz, bizId, uid).
 			Updates(map[string]any{
-				"utime":  now,
 				"status": 0,
+				"utime":  now,
 			}).Error
 		if err != nil {
 			return err
 		}
-		return tx.Model(&Interactive{}).
-			// 这边命中了索引，然后没找到，所以不会加锁
-			Where("biz=? AND biz_id = ?", biz, bizId).
-			Updates(map[string]any{
+		return dao.db.WithContext(ctx).Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]any{
+				"like_cnt": gorm.Expr("`like_cnt`-1"),
 				"utime":    now,
-				"like_cnt": gorm.Expr("like_cnt-1"),
-			}).Error
+			}),
+		}).Create(&Interactive{
+			LikeCnt: 1,
+			Ctime:   now,
+			Utime:   now,
+			Biz:     biz,
+			BizId:   bizId,
+		}).Error
 	})
+	return err
 }
 
 // IncrReadCnt 是一个插入或者更新语义
@@ -186,20 +188,22 @@ func (dao *GORMInteractiveDAO) IncrReadCnt(ctx context.Context, biz string, bizI
 	// 数据库帮你解决并发问题
 	// 有一个没考虑到，就是，我可能根本没这一行
 	// 事实上这里是一个 upsert 的语义
+	return dao.incrReadCnt(dao.db.WithContext(ctx), biz, bizId)
+}
+
+func (dao *GORMInteractiveDAO) incrReadCnt(tx *gorm.DB, biz string, bizId int64) error {
 	now := time.Now().UnixMilli()
-	return dao.db.WithContext(ctx).Clauses(clause.OnConflict{
-		// MySQL 不写
-		//Columns:
+	return tx.Clauses(clause.OnConflict{
 		DoUpdates: clause.Assignments(map[string]any{
-			"read_cnt": gorm.Expr("read_cnt + 1"),
-			"utime":    time.Now().UnixMilli(),
+			"read_cnt": gorm.Expr("`read_cnt`+1"),
+			"utime":    now,
 		}),
 	}).Create(&Interactive{
-		Biz:     biz,
-		BizId:   bizId,
 		ReadCnt: 1,
 		Ctime:   now,
 		Utime:   now,
+		Biz:     biz,
+		BizId:   bizId,
 	}).Error
 }
 
@@ -235,12 +239,12 @@ type Interactive struct {
 	//
 	// 联合索引的列的顺序：查询条件，区分度
 	// 这个名字无所谓
-	BizId int64 `gorm:"uniqueIndex:biz_id_type"`
+	BizId int64 `gorm:"uniqueIndex:biz_type_id"`
 	// 我这里biz 用的是 string，有些公司枚举使用的是 int 类型
 	// 0-article
 	// 1- xxx
 	// 默认是 BLOB/TEXT 类型
-	Biz string `gorm:"uniqueIndex:biz_id_type;type:varchar(128)"`
+	Biz string `gorm:"uniqueIndex:biz_type_id;type:varchar(128)"`
 	// 这个是阅读计数
 	ReadCnt    int64
 	LikeCnt    int64
@@ -264,11 +268,11 @@ type UserLikeBiz struct {
 	// 2. 如果你的场景是，我的点赞数量，需要通过这里来比较/纠正
 	// biz_id 和 biz 在前
 	// select count(*) where biz = ? and biz_id = ?
-	Biz   string `gorm:"uniqueIndex:uid_biz_id_type;type:varchar(128)"`
-	BizId int64  `gorm:"uniqueIndex:uid_biz_id_type"`
+	Biz   string `gorm:"uniqueIndex:biz_type_id_uid;type:varchar(128)"`
+	BizId int64  `gorm:"uniqueIndex:biz_type_id_uid"`
 
 	// 谁的操作
-	Uid int64 `gorm:"uniqueIndex:uid_biz_id_type"`
+	Uid int64 `gorm:"uniqueIndex:biz_type_id_uid"`
 
 	Ctime int64
 	Utime int64

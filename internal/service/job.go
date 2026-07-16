@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/JaylanCharles/byline/internal/domain"
+	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/pkg/logger"
 )
 

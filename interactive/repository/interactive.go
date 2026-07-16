@@ -4,21 +4,23 @@ import (
 	"context"
 	"errors"
 
-	"github.com/JaylanCharles/byline/internal/domain"
-	"github.com/JaylanCharles/byline/internal/repository/cache"
-	"github.com/JaylanCharles/byline/internal/repository/dao"
+	"github.com/JaylanCharles/byline/interactive/domain"
+	"github.com/JaylanCharles/byline/interactive/repository/cache"
+	"github.com/JaylanCharles/byline/interactive/repository/dao"
 	"github.com/JaylanCharles/byline/pkg/logger"
+	"github.com/ecodeclub/ekit/slice"
 )
 
 type InteractiveRepository interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
-	BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error
+	BatchIncrReadCnt(ctx context.Context, bizs []string, bizIds []int64) error
 	IncrLike(ctx context.Context, biz string, bizId, uid int64) error
 	DecrLike(ctx context.Context, biz string, bizId, uid int64) error
 	AddCollectionItem(ctx context.Context, biz string, bizId, cid int64, uid int64) error
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
+	GetByIds(ctx context.Context, biz string, ids []int64) ([]domain.Interactive, error)
 }
 
 type CachedReadCntRepository struct {
@@ -33,6 +35,17 @@ func NewCachedInteractiveRepository(dao dao.InteractiveDAO, cache cache.Interact
 		cache: cache,
 		l:     l,
 	}
+}
+
+func (c *CachedReadCntRepository) GetByIds(ctx context.Context, biz string, ids []int64) ([]domain.Interactive, error) {
+	vals, err := c.dao.GetByIds(ctx, biz, ids)
+	if err != nil {
+		return nil, err
+	}
+	return slice.Map[dao.Interactive, domain.Interactive](vals,
+		func(idx int, src dao.Interactive) domain.Interactive {
+			return c.toDomain(src)
+		}), nil
 }
 
 func (c *CachedReadCntRepository) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
@@ -51,16 +64,8 @@ func (c *CachedReadCntRepository) IncrReadCnt(ctx context.Context, biz string, b
 }
 
 // BatchIncrReadCnt bizs 和 ids 的长度必须相等
-func (c *CachedReadCntRepository) BatchIncrReadCnt(ctx context.Context, bizs []string, bizId []int64) error {
-	// 我在这里要不要检测 bizs 和 ids 的长度是否相等？
-	err := c.dao.BatchIncrReadCnt(ctx, bizs, bizId)
-	if err != nil {
-		return err
-	}
-	// 你也要批量的去修改 redis，所以就要去改 lua 脚本
-	// c.cache.IncrReadCntIfPresent()
-	// TODO, 等我写新的 lua 脚本/或者用 pipeline
-	return nil
+func (c *CachedReadCntRepository) BatchIncrReadCnt(ctx context.Context, bizs []string, bizIds []int64) error {
+	return c.dao.BatchIncrReadCnt(ctx, bizs, bizIds)
 }
 
 func (c *CachedReadCntRepository) IncrLike(ctx context.Context, biz string, bizId int64, uid int64) error {
@@ -89,8 +94,8 @@ func (c *CachedReadCntRepository) AddCollectionItem(ctx context.Context, biz str
 	// 用户会频繁访问他的收藏夹，那么你就应该缓存，不然你就不需要
 	// 一个东西要不要缓存，你就看用户会不会频繁访问（反复访问）
 	err := c.dao.InsertCollectionBiz(ctx, dao.UserCollectionBiz{
-		Cid:   cid,
 		Biz:   biz,
+		Cid:   cid,
 		BizId: bizId,
 		Uid:   uid,
 	})
@@ -109,22 +114,18 @@ func (c *CachedReadCntRepository) Get(ctx context.Context, biz string, bizId int
 	}
 
 	// 在这里查询数据库
-	daoIntr, err := c.dao.Get(ctx, biz, bizId)
-	if err != nil {
-		return domain.Interactive{}, err
-	}
-	intr = c.toDomain(daoIntr)
-	go func() {
-		er := c.cache.Set(ctx, biz, bizId, intr)
-		// 记录日志
-		if er != nil {
+	ie, err := c.dao.Get(ctx, biz, bizId)
+	if err == nil {
+		res := c.toDomain(ie)
+		if er := c.cache.Set(ctx, biz, bizId, res); er != nil {
 			c.l.Error("回写缓存失败",
-				logger.String("biz", biz),
 				logger.Int64("bizId", bizId),
-			)
+				logger.String("biz", biz),
+				logger.Error(er))
 		}
-	}()
-	return intr, nil
+		return res, nil
+	}
+	return domain.Interactive{}, err
 }
 
 func (c *CachedReadCntRepository) Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error) {
@@ -132,7 +133,7 @@ func (c *CachedReadCntRepository) Liked(ctx context.Context, biz string, id int6
 	switch {
 	case err == nil:
 		return true, nil
-	case errors.Is(err, dao.ErrRecordNotFound):
+	case errors.Is(err, dao.ErrDataNotFound):
 		// 你要吞掉
 		return false, nil
 	default:
@@ -145,7 +146,7 @@ func (c *CachedReadCntRepository) Collected(ctx context.Context, biz string, id 
 	switch {
 	case err == nil:
 		return true, nil
-	case errors.Is(err, dao.ErrRecordNotFound):
+	case errors.Is(err, dao.ErrDataNotFound):
 		// 你要吞掉
 		return false, nil
 	default:
@@ -155,6 +156,8 @@ func (c *CachedReadCntRepository) Collected(ctx context.Context, biz string, id 
 
 func (c *CachedReadCntRepository) toDomain(intr dao.Interactive) domain.Interactive {
 	return domain.Interactive{
+		Biz:        intr.Biz,
+		BizId:      intr.BizId,
 		LikeCnt:    intr.LikeCnt,
 		CollectCnt: intr.CollectCnt,
 		ReadCnt:    intr.ReadCnt,

@@ -21,3 +21,7 @@ mock:
 	@mockgen -source=pkg/ratelimit/types.go -destination=pkg/ratelimit/mocks/ratelimit.mocks.go -package=limitmocks
 	@mockgen -destination=internal/repository/cache/redismocks/cmdable.mock.go -package=redismocks github.com/redis/go-redis/v9 Cmdable
 	@go mod tidy
+
+.PHONY: grpc
+grpc:
+	@buf generate api/proto

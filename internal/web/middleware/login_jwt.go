@@ -35,9 +35,9 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 
 		tokenStr := l.ExtractToken(ctx)
 		// 这里使用指针的原因是， jwt.ParseWithClaims 中会获取 claims 将他赋值带出来
-		claims := &ijwt.UserClaims{}
-		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
-			return []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBr"), nil
+		claims := ijwt.UserClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, &claims, func(token *jwt.Token) (any, error) {
+			return []byte("vjYqKKBpPfsWGpfq1Ljo57BgjsMg9yBa"), nil
 		})
 		if err != nil {
 			// 没登录

@@ -3,6 +3,11 @@
 package main
 
 import (
+	"github.com/JaylanCharles/byline/interactive/events"
+	repository2 "github.com/JaylanCharles/byline/interactive/repository"
+	cache2 "github.com/JaylanCharles/byline/interactive/repository/cache"
+	dao2 "github.com/JaylanCharles/byline/interactive/repository/dao"
+	service2 "github.com/JaylanCharles/byline/interactive/service"
 	"github.com/JaylanCharles/byline/internal/events/article"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/JaylanCharles/byline/internal/repository/cache"
@@ -25,9 +30,10 @@ func InitWebServer() *App {
 		userServiceSet,
 		articlServiceSet,
 		codeServiceSet,
+		ioc.InitIntrGRPCClient,
 
 		// consumer
-		article.NewInteractiveReadEventConsumer,
+		events.NewInteractiveReadEventConsumer,
 		article.NewKafkaProducer,
 
 		ioc.InitSMSService,
@@ -61,13 +67,14 @@ var thirdPartySet = wire.NewSet(
 )
 
 var interactiveServiceSet = wire.NewSet(
-	service.NewInteractiveService,
-	repository.NewCachedInteractiveRepository,
-	dao.NewGORMInteractiveDAO,
-	cache.NewRedisInteractiveCache,
+	service2.NewInteractiveService,
+	repository2.NewCachedInteractiveRepository,
+	dao2.NewGORMInteractiveDAO,
+	cache2.NewRedisInteractiveCache,
 )
 
 var rankingServiceSet = wire.NewSet(
+	cache.NewRankingLocalCache,
 	service.NewBatchRankingService,
 	repository.NewCachedRankingRepository,
 	cache.NewRankingRedisCache,
@@ -84,6 +91,7 @@ var articlServiceSet = wire.NewSet(
 	service.NewArticleService,
 	repository.NewCachedArticleRepository,
 	articleDAO.NewGORMArticleDAO,
+	cache.NewRedisArticleCache,
 )
 
 var codeServiceSet = wire.NewSet(

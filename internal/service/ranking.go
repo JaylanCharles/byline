@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	intrv1 "github.com/JaylanCharles/byline/api/proto/gen/intr/v1"
 	"github.com/JaylanCharles/byline/internal/domain"
 	"github.com/JaylanCharles/byline/internal/repository"
 	"github.com/ecodeclub/ekit/queue"
@@ -18,7 +19,7 @@ type RankingService interface {
 
 type BatchRankingService struct {
 	artSvc    ArticleService
-	intrSvc   InteractiveService
+	intrSvc   intrv1.InteractiveServiceClient
 	repo      repository.RankingRepository
 	batchSize int
 	n         int
@@ -26,12 +27,13 @@ type BatchRankingService struct {
 	scoreFunc func(t time.Time, likeCnt int64) float64
 }
 
-func NewBatchRankingService(artSvc ArticleService, intrSvc InteractiveService) RankingService {
+func NewBatchRankingService(artSvc ArticleService, repo repository.RankingRepository, intrSvc intrv1.InteractiveServiceClient) RankingService {
 	return &BatchRankingService{
 		artSvc:    artSvc,
 		intrSvc:   intrSvc,
 		batchSize: 100,
 		n:         100,
+		repo:      repo,
 		scoreFunc: func(t time.Time, likeCnt int64) float64 {
 			sec := time.Since(t).Seconds()
 			return float64(likeCnt-1) / math.Pow(sec+2, 1.5)
@@ -82,14 +84,19 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 		})
 
 		// 要去找到对应的点赞数据
-		intrs, err := svc.intrSvc.GetByIds(ctx, "article", ids)
+		intrs, err := svc.intrSvc.GetByIds(ctx, &intrv1.GetByIdsRequest{
+			Biz: "article", Ids: ids,
+		})
 		if err != nil {
 			return nil, err
 		}
 
+		if len(intrs.Intrs) == 0 {
+			return nil, errors.New("没有数据")
+		}
 		// 计算 score
 		for _, art := range arts {
-			intr := intrs[art.Id]
+			intr := intrs.Intrs[art.Id]
 			score := svc.scoreFunc(art.Utime, intr.LikeCnt)
 
 			// 若空，则先直接入队
