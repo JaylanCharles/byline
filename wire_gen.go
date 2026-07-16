@@ -47,7 +47,8 @@ func InitWebServer() *App {
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService, handler)
 	articleDAO := article.NewGORMArticleDAO(db)
-	articleRepository := repository.NewCachedArticleRepository(articleDAO, logger)
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleRepository := repository.NewCachedArticleRepository(articleDAO, logger, articleCache, userRepository)
 	client := ioc.InitKafka()
 	syncProducer := ioc.NewSyncProducer(client)
 	producer := article2.NewKafkaProducer(syncProducer)
@@ -56,11 +57,15 @@ func InitWebServer() *App {
 	interactiveCache := cache2.NewRedisInteractiveCache(cmdable)
 	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, logger)
 	interactiveService := service2.NewInteractiveService(interactiveRepository, logger)
-	articleHandler := web.NewArticleHandler(articleService, interactiveService, logger)
+	interactiveServiceClient := ioc.InitIntrGRPCClient(interactiveService)
+	articleHandler := web.NewArticleHandler(articleService, logger, interactiveServiceClient)
 	engine := ioc.InitWebServer(v, userHandler, articleHandler)
 	interactiveReadEventConsumer := events.NewInteractiveReadEventConsumer(client, logger, interactiveRepository)
 	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
-	rankingService := service.NewBatchRankingService(articleService, interactiveService)
+	rankingRedisCache := cache.NewRankingRedisCache(cmdable)
+	rankingLocalCache := cache.NewRankingLocalCache()
+	rankingRepository := repository.NewCachedRankingRepository(rankingRedisCache, rankingLocalCache)
+	rankingService := service.NewBatchRankingService(articleService, rankingRepository, interactiveServiceClient)
 	rlockClient := ioc.InitRLockClient(cmdable)
 	rankingJob := ioc.InitRankingJob(rankingService, rlockClient, logger)
 	cron := ioc.InitJobs(logger, rankingJob)
@@ -78,10 +83,10 @@ var thirdPartySet = wire.NewSet(ioc.InitLogger, ioc.InitRedis, ioc.InitRLockClie
 
 var interactiveServiceSet = wire.NewSet(service2.NewInteractiveService, repository2.NewCachedInteractiveRepository, dao2.NewGORMInteractiveDAO, cache2.NewRedisInteractiveCache)
 
-var rankingServiceSet = wire.NewSet(service.NewBatchRankingService, repository.NewCachedRankingRepository, cache.NewRankingRedisCache)
+var rankingServiceSet = wire.NewSet(cache.NewRankingLocalCache, service.NewBatchRankingService, repository.NewCachedRankingRepository, cache.NewRankingRedisCache)
 
 var userServiceSet = wire.NewSet(service.NewUserService, repository.NewUserRepository, cache.NewUserCache, dao.NewUserDAO)
 
-var articlServiceSet = wire.NewSet(service.NewArticleService, repository.NewCachedArticleRepository, article.NewGORMArticleDAO)
+var articlServiceSet = wire.NewSet(service.NewArticleService, repository.NewCachedArticleRepository, article.NewGORMArticleDAO, cache.NewRedisArticleCache)
 
 var codeServiceSet = wire.NewSet(service.NewCodeService, repository.NewCodeRepository, cache.NewCodeCache)

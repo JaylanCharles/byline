@@ -9,11 +9,17 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
 func InitOTEL() func(ctx context.Context) {
-	res, err := newResource("byline", "v0.0.1")
+	ctx := context.Background()
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("byline"),
+			semconv.ServiceVersion("v0.0.1"),
+		),
+	)
 	if err != nil {
 		panic(err)
 	}

@@ -30,6 +30,7 @@ func InitWebServer() *App {
 		userServiceSet,
 		articlServiceSet,
 		codeServiceSet,
+		ioc.InitIntrGRPCClient,
 
 		// consumer
 		events.NewInteractiveReadEventConsumer,
@@ -73,6 +74,7 @@ var interactiveServiceSet = wire.NewSet(
 )
 
 var rankingServiceSet = wire.NewSet(
+	cache.NewRankingLocalCache,
 	service.NewBatchRankingService,
 	repository.NewCachedRankingRepository,
 	cache.NewRankingRedisCache,
@@ -89,6 +91,7 @@ var articlServiceSet = wire.NewSet(
 	service.NewArticleService,
 	repository.NewCachedArticleRepository,
 	articleDAO.NewGORMArticleDAO,
+	cache.NewRedisArticleCache,
 )
 
 var codeServiceSet = wire.NewSet(
